@@ -11,14 +11,16 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player
+from models import PlayerForm, PlayerMiniForm, Player, GameForm
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
-PLAYER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1),
-                                           email=messages.StringField(2))
+PLAYER_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    user_name=messages.StringField(1),
+    email=messages.StringField(2))
 PLAYER_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeConferenceKey=messages.StringField(1),
@@ -47,7 +49,6 @@ class TictactoeApi(remote.Service):
         pf.check_initialized()
         return pf
 
-
     def _getProfileFromPlayer(self):
         """Return player Profile from datastore, creating new one if non-existent."""
         # If the incoming method has a valid auth or ID token, endpoints.get_current_user()
@@ -58,7 +59,6 @@ class TictactoeApi(remote.Service):
         user_id = getUserId(user)
         player_key = ndb.Key(Player, user_id)
         player = player_key.get()
-
         if not player:
             player = Player(
                 key = player_key,
@@ -69,7 +69,6 @@ class TictactoeApi(remote.Service):
                 winTotal = 0,
                 gameTotal = 0)
             player.put()
-
         return player
 
     def _doProfile(self, save_request=None):
@@ -77,7 +76,7 @@ class TictactoeApi(remote.Service):
         # get user Profile
         player = self._getProfileFromPlayer()
 
-        # if saveProfile(), process user-modifyable fields
+        # if saveProfile(), process user-modifiable fields
         if save_request:
             for field in ('displayName'):
                 if hasattr(save_request, field):
@@ -100,10 +99,44 @@ class TictactoeApi(remote.Service):
     @endpoints.method(PlayerMiniForm, PlayerForm,
             path='player', http_method='POST', name='savePlayer')
     def savePlayer(self, request):
-        """Update & return user profile."""
+        """Update & return player profile."""
         logging.info('saving your profile')
         return self._doProfile(request)
 
+    @endpoints.method(message_types.VoidMessage, GameForm,
+            path='new_game', http_method='POST', name='createGame')
+    def createGame(self, request):
+        """create a game, creator automatically becomes playerOne"""
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        user_id = getUserId(user)
+        gf = GameForm(
+            playerOneId = user_id,
+            gameOver = False)
+        return gf
+
+    # def playGame:
+
+    # def getPlayerGames:
+    #     """
+    #     This returns all of a User's active games. You may want to modify the
+    #     User and Game models to simplify this type of query. Hint: it might
+    #     make sense for each game to be a descendant of a User.
+    #     """
+    # def cancelGame:
+    #     """
+    #     This endpoint allows users to cancel a game in progress.
+    #     You could implement this by deleting the Game model itself,
+    #     or add a Boolean field such as 'cancelled' to the model. Ensure that
+    #     Users are not permitted to remove completed games.
+    #     """
+
+    # def getPlayerRankings:
+    #     """ each Player's name and the 'performance' indicator (eg. win/loss
+    #      ratio)."""
+    # def getGameHistory:
+    #     """ a 'history' of the moves for each game"""
 # - - - Conference objects - - - - - - - - - - - - - - - - -
 
     # def _copyConferenceToForm(self, conf, displayName):

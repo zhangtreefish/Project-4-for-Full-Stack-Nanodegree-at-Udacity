@@ -21,9 +21,9 @@ class Player(ndb.Model):
 
 class Game(ndb.Model):
     """Game kind, to generate game entities with"""
-    playerOneId = ndb.StringProperty()
-    playerTwoId = ndb.StringProperty()
-    gameTotalMoves = ndb.IntegerProperty()
+    # playerOneId = ndb.StringProperty()
+    # playerTwoId = ndb.StringProperty()
+    gameMoves = ndb.IntegerProperty()
     position1A = ndb.StringProperty()
     position1B = ndb.StringProperty()
     position1C = ndb.StringProperty()
@@ -47,18 +47,24 @@ class PlayerForm(messages.Message):
 
 class GameForm(messages.Message):
     """outbound form message as response object"""
-    name            = messages.StringField(1)
-    description     = messages.StringField(2)
-    organizerUserId = messages.StringField(3)
-    topics          = messages.StringField(4, repeated=True)
-    city            = messages.StringField(5)
-    startDate       = messages.StringField(6)
-    month           = messages.IntegerField(7, variant=messages.Variant.INT32)
-    maxAttendees    = messages.IntegerField(8, variant=messages.Variant.INT32)
-    seatsAvailable  = messages.IntegerField(9, variant=messages.Variant.INT32)
-    endDate         = messages.StringField(10)
-    websafeKey      = messages.StringField(11)
-    organizerDisplayName = messages.StringField(12)
+    playerOneId = messages.StringField(1, required=True)
+    playerTwoId = messages.StringField(2)
+    gameMoves = messages.IntegerField(3)
+    position1A = messages.StringField(4)
+    position1B = messages.StringField(5)
+    position1C = messages.StringField(6)
+    position2A = messages.StringField(7)
+    position2B = messages.StringField(8)
+    position2C = messages.StringField(9)
+    position3A = messages.StringField(10)
+    position3B = messages.StringField(11)
+    position3C = messages.StringField(12)
+    gameOver = messages.BooleanField(13)
+
+class MoveForm(messages.Message):
+    """inbound form message as request object for making a move"""
+    playerId = messages.StringField(1)
+    positionPlayed = messages.StringField(2)
 
 class GameForms(messages.Message):
     """ multiple game outbound form message as response object"""
