@@ -12,6 +12,7 @@ class ConflictException(endpoints.ServiceException):
 class Player(ndb.Model):
     """Player kind, to represent player profile"""
     # Id = ndb.StringProperty()  # Should  Id be here or not?
+    # use MD5 hash of the email to use as id
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
     gamesInProgress = ndb.StringProperty(repeated=True)

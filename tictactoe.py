@@ -11,7 +11,7 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player, GameForm, Game
+from models import PlayerForm, PlayerMiniForm, Player, GameForm, Game, GameForms
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -153,26 +153,45 @@ class TictactoeApi(remote.Service):
         return gf
 
 
-    @endpoints.method(message_types.VoidMessage, GameForm,
-            path='join_game/{websafeConferenceKey}', http_method='POST', name='joinGame')
+    @endpoints.method(GAME_GET_REQUEST, GameForm,
+            path='join_game/{websafeGameKey}', http_method='POST', name='joinGame')
     def joinGame(self, request):
-        """join a game as playerTwo"""
+        """current player joins a game as playerTwo AND as an ancestor of the game"""
+        # get the specified game
+        print '!!', request.websafeGameKey
+        game = ndb.Key(urlsafe=request.websafeGameKey).get()
+        if not game:
+            raise endpoints.NotFoundException(
+                'No game found with key: %s' % request.websafeGameKey)
+        # get the authorized user id
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
         user_id = getUserId(user)
-        gf = GameForm(
-            playerTwoId = user_id)
-        return gf
+        # update the specified game
+        game.playerTwoId = user_id
+        game.put()
+        return self._copyGameToForm(game)
 
     # def playGame:
 
-    # def getPlayerGames:
-    #     """
-    #     This returns all of a User's active games. You may want to modify the
-    #     User and Game models to simplify this type of query. Hint: it might
-    #     make sense for each game to be a descendant of a User.
-    #     """
+    @endpoints.method(message_types.VoidMessage, GameForms,
+            path='games', http_method='GET', name='getPlayerGames')
+    def getPlayerGames(self, request):
+        """
+        This returns all of a User's active games. You may want to modify the
+        User and Game models to simplify this type of query. Hint: it might
+        make sense for each game to be a descendant of a User.
+        """
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        user_id = getUserId(user)
+        p_key = ndb.Key(Player, user_id)
+        games = Game.query(ancestor=p_key).fetch()
+        return GameForms(
+            items=[self._copyGameToForm(game) for game in games])
+
     # def cancelGame:
     #     """
     #     This endpoint allows users to cancel a game in progress.
@@ -202,74 +221,7 @@ class TictactoeApi(remote.Service):
         return gf
 
 
-    def _createGameObject(self, request):
-        """Create or update Game object, returning GameForm/request."""
-        # preload necessary data items
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
 
-        if not request.playerOneId:
-            raise endpoints.BadRequestException("Game 'playerOneId' field required")
-
-        # copy ConferenceForm/ProtoRPC Message into dict
-        data = {field.name: getattr(request, field.name) for field in request.all_fields()}
-        del data['websafeKey']
-        del data['organizerDisplayName']
-
-        # add default values for those missing (both data model & outbound Message)
-        for df in DEFAULTS:
-            if data[df] in (None, []):
-                data[df] = DEFAULTS[df]
-                setattr(request, df, DEFAULTS[df])
-
-        # convert dates from strings to Date objects; set month based on start_date
-        if data['startDate']:
-            logging.info('date')
-            logging.info(data['startDate'])
-            print 'date', data['startDate']
-            # datetime.date(): Return date object (y,m,d) to comply with DateProperty.
-            data['startDate'] = datetime.strptime(data['startDate'][:10], "%Y-%m-%d").date()
-            data['month'] = data['startDate'].month
-        else:
-            data['month'] = 0
-        if data['endDate']:
-            data['endDate'] = datetime.strptime(data['endDate'][:10], "%Y-%m-%d").date()
-
-        # set seatsAvailable to be same as maxAttendees on creation
-        # both for data model & outbound Message
-        if data["maxAttendees"] > 0:
-            data["seatsAvailable"] = data["maxAttendees"]
-            setattr(request, "seatsAvailable", data["maxAttendees"])
-
-        # make Profile Key from user ID
-        p_key = ndb.Key(Profile, user_id)
-        # allocate new Conference ID with Profile key as parent
-        # allocate_ids(size=None, max=None, parent=None, **ctx_options)
-        # returns a tuple with (start, end) for the allocated range, inclusive.
-        c_id = Conference.allocate_ids(size=1, parent=p_key)[0]
-        # make Conference key from ID
-        c_key = ndb.Key(Conference, c_id, parent=p_key)
-        data['key'] = c_key
-        data['organizerUserId'] = request.organizerUserId = user_id
-
-        # create Conference & return (modified) ConferenceForm
-        #  ** means that  kw is initialized to a new dictionary receiving any
-        # excess keyword arguments
-        Conference(**data).put()
-        taskqueue.add(params={'email': user.email(),
-            'conferenceInfo': repr(request)},
-            url='/tasks/send_confirmation_email'
-        )
-        return request
-
-
-    # @endpoints.method(ConferenceForm, ConferenceForm, path='conference',
-    #         http_method='POST', name='createConference')
-    # def createConference(self, request):
-    #     """Create new conference."""
-    #     return self._createConferenceObject(request)
 
 
     # @endpoints.method(ConferenceQueryForms, ConferenceForms,
@@ -319,10 +271,10 @@ class TictactoeApi(remote.Service):
             raise endpoints.NotFoundException(
                 'No game found with key: %s' % request.websafeGameKey)
         player = game.key.parent().get()
-        logging.debug('prof')
-        logging.debug(prof)
+        logging.debug('player')
+        logging.debug(player)
         # return ConferenceForm
-        return self._copyGameToForm(game, getattr(player, 'displayName'))
+        return self._copyGameToForm(game)
 
     # @endpoints.method(message_types.VoidMessage, ConferenceForms,
     #     path='filterConferences',
