@@ -21,9 +21,9 @@ class Player(ndb.Model):
 
 class Game(ndb.Model):
     """Game kind, to generate game entities with"""
-    # playerOneId = ndb.StringProperty()
-    # playerTwoId = ndb.StringProperty()
-    gameMoves = ndb.IntegerProperty()
+    playerOneId = ndb.StringProperty()
+    playerTwoId = ndb.StringProperty()
+    gameCurrentMove = ndb.IntegerProperty()
     position1A = ndb.StringProperty()
     position1B = ndb.StringProperty()
     position1C = ndb.StringProperty()
@@ -60,6 +60,8 @@ class GameForm(messages.Message):
     position3B = messages.StringField(11)
     position3C = messages.StringField(12)
     gameOver = messages.BooleanField(13)
+    websafeKey = messages.StringField(14)
+
 
 class MoveForm(messages.Message):
     """inbound form message as request object for making a move"""
