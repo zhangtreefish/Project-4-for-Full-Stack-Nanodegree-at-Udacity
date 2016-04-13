@@ -74,19 +74,19 @@ class TictactoeApi(remote.Service):
             player.put()
         return player
 
-    def _doProfile(self, save_request=None):
+    def _doProfile(self, edit_request=None):
         """Get player Profile and return to player, possibly updating it first."""
         # get user Profile
         player = self._getProfileFromPlayer()
 
         # if saveProfile(), process user-modifiable fields
-        if save_request:
-            for field in ('displayName'):
-                if hasattr(save_request, field):
-                    val = getattr(save_request, field)
+        if edit_request:
+            for field in ['displayName']:
+                if hasattr(edit_request, field):
+                    val = getattr(edit_request, field)
                     if val:
                         setattr(player, field, str(val))
-                        player.put()
+            player.put()
 
         # return ProfileForm
         return self._copyPlayerToForm(player)
@@ -101,21 +101,26 @@ class TictactoeApi(remote.Service):
 
 # TODO: not updating
     @endpoints.method(PlayerMiniForm, PlayerForm,
-            path='player', http_method='POST', name='savePlayer')
-    def savePlayer(self, request):
+            path='edit_player', http_method='POST', name='editPlayer')
+    def editPlayer(self, request):
         """Update displayName & profile of the current player"""
         logging.info('saving your profile')
         return self._doProfile(request)
 
+    @ndb.transactional(xg=True)  # is it needed with the ancestor declaration?
     @endpoints.method(message_types.VoidMessage, GameForm,
             path='new_game', http_method='POST', name='createGame')
     def createGame(self, request):
-        """create a game, creator automatically becomes playerOne"""
+        """
+        create a game, creator automatically becomes playerOne; update
+        player profile
+        """
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
         user_id = getUserId(user)
         p_key = ndb.Key(Player, user_id)
+        player = p_key.get()
         # allocate new Game ID with Player key as parent
         # allocate_ids(size=None, max=None, parent=None, **ctx_options)
         # returns a tuple with (start, end) for the allocated range, inclusive.
@@ -148,6 +153,8 @@ class TictactoeApi(remote.Service):
     #         url='/tasks/send_confirmation_email'
     #     )
         game = g_key.get()
+        player.gamesInProgress += g_key
+        player.gamesTotal += 1
         # displayName = p_key.get().displayName
         gf = self._copyGameToForm(game)
         return gf
@@ -156,7 +163,7 @@ class TictactoeApi(remote.Service):
     @endpoints.method(GAME_GET_REQUEST, GameForm,
             path='join_game/{websafeGameKey}', http_method='POST', name='joinGame')
     def joinGame(self, request):
-        """current player joins a game as playerTwo AND as an ancestor of the game"""
+        """current player joins a game as playerTwo"""
         # get the specified game
         print '!!', request.websafeGameKey
         game = ndb.Key(urlsafe=request.websafeGameKey).get()
@@ -179,9 +186,8 @@ class TictactoeApi(remote.Service):
             path='games', http_method='GET', name='getPlayerGames')
     def getPlayerGames(self, request):
         """
-        This returns all of a User's active games. You may want to modify the
-        User and Game models to simplify this type of query. Hint: it might
-        make sense for each game to be a descendant of a User.
+        This returns all of a User's active games, including those as playerOne
+        AND as playerTwo.
         """
         user = endpoints.get_current_user()
         if not user:
@@ -189,16 +195,37 @@ class TictactoeApi(remote.Service):
         user_id = getUserId(user)
         p_key = ndb.Key(Player, user_id)
         games = Game.query(ancestor=p_key).fetch()
+        player_two_games = Game.query(Game.playerTwoId==user_id).fetch()
+        if player_two_games:
+            for game in player_two_games:
+                if game not in games:
+                    games.append(game)
         return GameForms(
             items=[self._copyGameToForm(game) for game in games])
 
-    # def cancelGame:
-    #     """
-    #     This endpoint allows users to cancel a game in progress.
-    #     You could implement this by deleting the Game model itself,
-    #     or add a Boolean field such as 'cancelled' to the model. Ensure that
-    #     Users are not permitted to remove completed games.
-    #     """
+    @endpoints.method(GAME_GET_REQUEST, GameForm,
+            path='cancel_game/{websafeGameKey}', http_method='POST',
+            name='cancelGame')
+    def cancelGame(self, request):
+        """
+        allows either player to cancel a game in progress, implemented by
+        deleting the Game model itself
+        """
+        # get the game
+        game_key = request.websafeGameKey
+        game = ndb.Key(urlsafe=game_key).get()
+        # check if the current player is in the game
+        user = user = endpoints.get_current_user()
+        user_id = getUserId(user)
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        elif user_id not in [game.playerOneId, game.playerTwoId]:
+            raise endpoints.UnauthorizedException('Only players can cancel \
+                games')
+        else:
+            game_key.delete()
+
+
 
     # def getPlayerRankings:
     #     """ each Player's name and the 'performance' indicator (eg. win/loss
@@ -220,46 +247,6 @@ class TictactoeApi(remote.Service):
         gf.check_initialized()
         return gf
 
-
-
-
-
-    # @endpoints.method(ConferenceQueryForms, ConferenceForms,
-    #             path='queryConferences',
-    #             http_method='POST',
-    #             name='queryConferences')
-    # def queryConferences(self,request):
-    #     """Query for conferences."""
-    #     conferences = self._getQuery(request)
-
-    #      # return individual ConferenceForm object per Conference
-    #     return ConferenceForms(
-    #         items=[self._copyConferenceToForm(conf, "") for conf in conferences]
-    #     )
-
-    # @endpoints.method(message_types.VoidMessage, ConferenceForms,
-    #     path='getConferencesCreated',
-    #     http_method='POST',
-    #     name='getConferencesCreated')
-    # def getConferencesCreated(self, request):
-    #     """Return conferences created by the user."""
-    #     # make sure user is authed
-    #     user = endpoints.get_current_user()
-    #     if not user:
-    #         raise endpoints.UnauthorizedException('Authorization required')
-
-    #     # make profile key
-    #     p_key = ndb.Key(Profile, getUserId(user))
-    #     # create ancestor query for this user
-    #     conferences = Conference.query(ancestor=p_key).fetch()
-    #     # get the user profile and display name
-    #     prof = p_key.get()
-    #     displayName = getattr(prof, 'displayName')
-    #     # return set of ConferenceForm objects per Conference
-    #     return ConferenceForms(
-    #         items=[self._copyConferenceToForm(conf, displayName) for conf in conferences]
-    #     )
-
     @endpoints.method(GAME_GET_REQUEST, GameForm,
             path='game/{websafeGameKey}',
             http_method='GET', name='getGame')
@@ -276,20 +263,6 @@ class TictactoeApi(remote.Service):
         # return ConferenceForm
         return self._copyGameToForm(game)
 
-    # @endpoints.method(message_types.VoidMessage, ConferenceForms,
-    #     path='filterConferences',
-    #     http_method='GET',
-    #     name='filterConferences')
-    # def filterConferences(self, request):
-    #     """return conferences of certain properties values"""
-
-    #     # create ancestor query for this user,.filter(ndb.query.FilterNode(field, operator, value)) \
-    #     conferences = Conference.query().filter(Conference.city == 'London')\
-    #                   .filter(Conference.topics=='Medical Innovations')\
-    #                   .filter(Conference.maxAttendees>10)
-    #     return ConferenceForms(
-    #         items=[self._copyConferenceToForm(conf, "") for conf in conferences]
-    #     )
 
     # def _getQuery(self, request):
     #     """Return formatted query from the submitted filters."""
