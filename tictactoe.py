@@ -3,6 +3,7 @@
 
 from google.appengine.api import memcache
 from models import StringMessage
+from models import BooleanMessage
 from google.appengine.ext import db
 
 from google.appengine.api import taskqueue
@@ -30,7 +31,17 @@ GAME_GET_REQUEST = endpoints.ResourceContainer(
 #     websafeGameKey=messages.StringField(1),
 # )
 MEMCACHE_ANNOUNCEMENTS_KEY = "Recent Announcements"
-
+DEFAULTS = {
+    "positionOneA": '',
+    "positionOneB": '',
+    "positionOneC": '',
+    "positionTwoA": '',
+    "positionTwoB": '',
+    "positionTwoC": '',
+    "positionThreeA": '',
+    "positionThreeB": '',
+    "positionThreeC": ''
+}
 
 @endpoints.api( name='tictactoe',
                 version='v1',
@@ -69,8 +80,8 @@ class TictactoeApi(remote.Service):
                 mainEmail= user.email(),
                 gamesInProgress = [],
                 gamesCompleted = [],
-                winTotal = 0,
-                gameTotal = 0)
+                winsTotal = 0,
+                gamesTotal = 0)
             player.put()
         return player
 
@@ -107,9 +118,9 @@ class TictactoeApi(remote.Service):
         logging.info('saving your profile')
         return self._doProfile(request)
 
-    @ndb.transactional(xg=True)  # is it needed with the ancestor declaration?
+    # @ndb.transactional(xg=True)  # is it needed with the ancestor declaration?
     @endpoints.method(message_types.VoidMessage, GameForm,
-            path='new_game', http_method='POST', name='createGame')
+            path='create_game', http_method='POST', name='createGame')
     def createGame(self, request):
         """
         create a game, creator automatically becomes playerOne; update
@@ -127,34 +138,34 @@ class TictactoeApi(remote.Service):
         g_id = Game.allocate_ids(size=1, parent=p_key)[0]
         # make Game key from ID
         g_key = ndb.Key(Game, g_id, parent=p_key)
-
+        # # update player
+        # player.gamesInProgress.append(g_key)
+        # player.put()
         data = {}  # is a dict
         data['key'] = g_key
         data['playerOneId'] = user_id
-        # data['playerTwoId'] = None
-        # data['gameMoves'] = 0
-        # data['position1A']  = ''
-        # data['position1B']  = ''
-        # data['position1C']  = ''
-        # data['position2A']  = ''
-        # data['position2B']  = ''
-        # data['position2C']  = ''
-        # data['position3A']  = ''
-        # data['position3B']  = ''
-        # data['position3C']  = ''
-        data['gameOver']  = False
-        data['gameCurrentMove']  = 0
+
+        # add default values for those missing (both data model & outbound Message)
+        # for df in DEFAULTS:
+        #     if data[df] is None:
+        #         data[df] = DEFAULTS[df]
+        #         setattr(request, df, DEFAULTS[df])
+
+        data['gameOver'] = False
+        # data['gameCancelled'] = False
+        data['gameCurrentMove'] = 0
 
         Game(**data).put()
 
 
-    #     taskqueue.add(params={'email': user.email(),
-    #         'conferenceInfo': repr(request)},
-    #         url='/tasks/send_confirmation_email'
-    #     )
+        taskqueue.add(params={'email': user.email(),
+            'gameInfo': repr(request)},
+            url='/tasks/send_confirmation_email'
+        )
         game = g_key.get()
-        player.gamesInProgress += g_key
-        player.gamesTotal += 1
+
+        # player.gamesTotal = player.gamesTotal + 1  # throws TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
+
         # displayName = p_key.get().displayName
         gf = self._copyGameToForm(game)
         return gf
@@ -203,7 +214,7 @@ class TictactoeApi(remote.Service):
         return GameForms(
             items=[self._copyGameToForm(game) for game in games])
 
-    @endpoints.method(GAME_GET_REQUEST, GameForm,
+    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
             path='cancel_game/{websafeGameKey}', http_method='POST',
             name='cancelGame')
     def cancelGame(self, request):
@@ -217,13 +228,17 @@ class TictactoeApi(remote.Service):
         # check if the current player is in the game
         user = user = endpoints.get_current_user()
         user_id = getUserId(user)
+        cancelled = False
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
         elif user_id not in [game.playerOneId, game.playerTwoId]:
             raise endpoints.UnauthorizedException('Only players can cancel \
                 games')
         else:
-            game_key.delete()
+            # game_key.delete()
+            cancelled = True
+            db.delete(game_key)
+        return BooleanMessage(data =cancelled)
 
 
 
