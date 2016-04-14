@@ -123,8 +123,7 @@ class TictactoeApi(remote.Service):
             path='create_game', http_method='POST', name='createGame')
     def createGame(self, request):
         """
-        create a game, creator automatically becomes playerOne; update
-        player profile
+        create a game
         """
         user = endpoints.get_current_user()
         if not user:
@@ -143,7 +142,7 @@ class TictactoeApi(remote.Service):
         # player.put()
         data = {}  # is a dict
         data['key'] = g_key
-        data['playerOneId'] = user_id
+        # data['playerOneId'] = user_id
 
         # add default values for those missing (both data model & outbound Message)
         # for df in DEFAULTS:
@@ -393,32 +392,32 @@ class TictactoeApi(remote.Service):
     #     """Unregister user for selected conference."""
     #     return self._conferenceRegistration(request,False)
 
-    # @endpoints.method(message_types.VoidMessage, ConferenceForms,
-    #         path='conferences/attending',
-    #         http_method='GET', name='getConferencesToAttend')
-    # def getConferencesToAttend(self, request):
-    #     """Get list of conferences that user has registered for."""
-    #     # TODO:
-    #     # step 1: get user profile
-    #     prof = self._getProfileFromUser()
-    #     # step 2: get conferenceKeysToAttend from profile.
-    #     keys =getattr(prof,'conferenceKeysToAttend')
-    #     logging.debug('keys')
+    @endpoints.method(message_types.VoidMessage, GameForms,
+            path='games/active',
+            http_method='GET', name='getActiveGames')
+    def getActiveGames(self, request):
+        """Get a list of games that the player is engaged in."""
+        # TODO:
+        # step 1: get user profile
+        prof = self._getProfileFromUser()
+        # step 2: get conferenceKeysToAttend from profile.
+        keys =getattr(prof,'conferenceKeysToAttend')
+        logging.debug('keys')
 
-    #     # TODO
-    #     # to make a ndb key from websafe key you can use:
-    #     # ndb.Key(urlsafe=my_websafe_key_string)
-    #     safe_keys=[]
-    #     for key in keys:
-    #         safe_keys.append(ndb.Key(urlsafe=key))
-    #     # step 3: fetch conferences from datastore.
-    #     # Use get_multi(array_of_keys) to fetch all keys at once.
-    #     # Do not fetch them one by one!
-    #     conferences = ndb.get_multi(safe_keys)
-    #     # return set of ConferenceForm objects per Conference
-    #     return ConferenceForms(items=[self._copyConferenceToForm(conf, "")\
-    #      for conf in conferences]
-    #     )
+        # TODO
+        # to make a ndb key from websafe key you can use:
+        # ndb.Key(urlsafe=my_websafe_key_string)
+        safe_keys=[]
+        for key in keys:
+            safe_keys.append(ndb.Key(urlsafe=key))
+        # step 3: fetch conferences from datastore.
+        # Use get_multi(array_of_keys) to fetch all keys at once.
+        # Do not fetch them one by one!
+        conferences = ndb.get_multi(safe_keys)
+        # return set of ConferenceForm objects per Conference
+        return ConferenceForms(items=[self._copyConferenceToForm(conf, "")\
+         for conf in conferences]
+        )
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod
