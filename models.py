@@ -17,24 +17,26 @@ class Player(ndb.Model):
     mainEmail = ndb.StringProperty()
     gamesInProgress = ndb.StringProperty(repeated=True)
     gamesCompleted = ndb.StringProperty(repeated=True)
-    winTotal = ndb.IntegerProperty()
-    gameTotal = ndb.IntegerProperty()
+    # winsTotal = ndb.IntegerProperty()
+    # gamesTotal = ndb.IntegerProperty()
 
 class Game(ndb.Model):
     """Game kind, to generate game entities with"""
+    seatsAvailable = ndb.IntegerProperty()
     playerOneId = ndb.StringProperty()
     playerTwoId = ndb.StringProperty()
     gameCurrentMove = ndb.IntegerProperty()
-    position1A = ndb.StringProperty()
-    position1B = ndb.StringProperty()
-    position1C = ndb.StringProperty()
-    position2A = ndb.StringProperty()
-    position2B = ndb.StringProperty()
-    position2C = ndb.StringProperty()
-    position3A = ndb.StringProperty()
-    position3B = ndb.StringProperty()
-    position3C = ndb.StringProperty()
+    positionOneA = ndb.StringProperty()
+    positionOneB = ndb.StringProperty()
+    positionOneC = ndb.StringProperty()
+    positionTwoA = ndb.StringProperty()
+    positionTwoB = ndb.StringProperty()
+    positionTwoC = ndb.StringProperty()
+    positionThreeA = ndb.StringProperty()
+    positionThreeB = ndb.StringProperty()
+    positionThreeC = ndb.StringProperty()
     gameOver = ndb.BooleanProperty()
+    # gameCancelled = ndb.BooleanProperty()
 
 class PlayerMiniForm(messages.Message):
     """ as inbound request message"""
@@ -45,10 +47,14 @@ class PlayerForm(messages.Message):
     userId = messages.StringField(1)
     displayName = messages.StringField(2)
     mainEmail = messages.StringField(3)
+    gamesInProgress = messages.StringField(4, repeated=True)
+    gamesCompleted = messages.StringField(5, repeated=True)
+    # winsTotal = messages.IntegerField(6)
+    # gamesTotal = messages.IntegerField(7)
 
 class GameForm(messages.Message):
     """outbound form message as response object"""
-    playerOneId = messages.StringField(1, required=True)
+    playerOneId = messages.StringField(1)
     playerTwoId = messages.StringField(2)
     gameMoves = messages.IntegerField(3)
     position1A = messages.StringField(4)
@@ -62,6 +68,7 @@ class GameForm(messages.Message):
     position3C = messages.StringField(12)
     gameOver = messages.BooleanField(13)
     websafeKey = messages.StringField(14)
+    seatsAvailable = messages.IntegerField(15)
 
 
 class MoveForm(messages.Message):

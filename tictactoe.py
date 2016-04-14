@@ -12,7 +12,7 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player, GameForm, Game, GameForms
+from models import PlayerForm, PlayerMiniForm, Player, GameForm, Game, GameForms, ConflictException
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -40,7 +40,9 @@ DEFAULTS = {
     "positionTwoC": '',
     "positionThreeA": '',
     "positionThreeB": '',
-    "positionThreeC": ''
+    "positionThreeC": '',
+    "gameCurrentMove": 0,
+    "seatsAvailable": 2
 }
 
 @endpoints.api( name='tictactoe',
@@ -84,6 +86,16 @@ class TictactoeApi(remote.Service):
                 gamesTotal = 0)
             player.put()
         return player
+
+    def _getIdFromPlayer(self):
+        """Return player Id from datastore, creating new one if non-existent."""
+        # If the incoming method has a valid auth or ID token, endpoints.get_current_user()
+        # returns a User, otherwise it returns None.
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        user_id = getUserId(user)
+        return user_id
 
     def _doProfile(self, edit_request=None):
         """Get player Profile and return to player, possibly updating it first."""
@@ -137,12 +149,8 @@ class TictactoeApi(remote.Service):
         g_id = Game.allocate_ids(size=1, parent=p_key)[0]
         # make Game key from ID
         g_key = ndb.Key(Game, g_id, parent=p_key)
-        # # update player
-        # player.gamesInProgress.append(g_key)
-        # player.put()
         data = {}  # is a dict
         data['key'] = g_key
-        # data['playerOneId'] = user_id
 
         # add default values for those missing (both data model & outbound Message)
         # for df in DEFAULTS:
@@ -153,41 +161,55 @@ class TictactoeApi(remote.Service):
         data['gameOver'] = False
         # data['gameCancelled'] = False
         data['gameCurrentMove'] = 0
-
+        data['seatsAvailable'] = 2
         Game(**data).put()
-
 
         taskqueue.add(params={'email': user.email(),
             'gameInfo': repr(request)},
             url='/tasks/send_confirmation_email'
         )
         game = g_key.get()
+        print 'game', game
 
         # player.gamesTotal = player.gamesTotal + 1  # throws TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
-
         # displayName = p_key.get().displayName
         gf = self._copyGameToForm(game)
         return gf
 
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
-            path='join_game/{websafeGameKey}', http_method='POST', name='joinGame')
-    def joinGame(self, request):
-        """current player joins a game as playerTwo"""
+            path='participate_game/{websafeGameKey}', http_method='POST', name='participateGame')
+    def participateGame(self, request):
+        """current player participates in a game as either playerOne or playerTwo"""
         # get the specified game
         print '!!', request.websafeGameKey
-        game = ndb.Key(urlsafe=request.websafeGameKey).get()
+        game_key = ndb.Key(urlsafe=request.websafeGameKey)
+        game = game_key.get()
+        print 'game!!:', game
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: %s' % request.websafeGameKey)
         # get the authorized user id
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
+        player = self._getProfileFromPlayer()
+
         # update the specified game
-        game.playerTwoId = user_id
+        user_id = self._getIdFromPlayer()
+        if game.playerOneId is None:
+            game.playerOneId = str(user_id)
+            player.gamesInProgress.append(game_key)
+            game.seatsAvailable -= 1
+
+        elif game.playerTwoId is None:
+            game.playerTwoId = str(user_id)
+            player.gamesInProgress.append(game_key)
+            game.seatsAvailable -= 1
+
+        else:
+            raise endpoints.UnauthorizedException('Game has two players already')
+        print 'game!!:', game
         game.put()
+        player.put()
+
         return self._copyGameToForm(game)
 
     # def playGame:
@@ -214,9 +236,9 @@ class TictactoeApi(remote.Service):
             items=[self._copyGameToForm(game) for game in games])
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-            path='cancel_game/{websafeGameKey}', http_method='POST',
-            name='cancelGame')
-    def cancelGame(self, request):
+            path='delete_game/{websafeGameKey}', http_method='DELETE',
+            name='deleteGame')
+    def deleteGame(self, request):
         """
         allows either player to cancel a game in progress, implemented by
         deleting the Game model itself
@@ -225,10 +247,9 @@ class TictactoeApi(remote.Service):
         game_key = request.websafeGameKey
         game = ndb.Key(urlsafe=game_key).get()
         # check if the current player is in the game
-        user = user = endpoints.get_current_user()
-        user_id = getUserId(user)
+        user_id = self._getIdFromPlayer()
         cancelled = False
-        if not user:
+        if not user_id:
             raise endpoints.UnauthorizedException('Authorization required')
         elif user_id not in [game.playerOneId, game.playerTwoId]:
             raise endpoints.UnauthorizedException('Only players can cancel \
@@ -239,9 +260,19 @@ class TictactoeApi(remote.Service):
             db.delete(game_key)
         return BooleanMessage(data =cancelled)
 
+    @endpoints.method(message_types.VoidMessage, BooleanMessage,
+            path='delete_all_games', http_method='DELETE',
+            name='deleteAllGames')
+    def deleteAllGames(self, request):
+        """
+        deleting all Games created by current player
+        """
 
+        ndb.delete_multi(Game.query().fetch(keys_only=True))
+        deleted = True
+        return BooleanMessage(data =deleted)
 
-    # def getPlayerRankings:
+        # def getPlayerRankings:
     #     """ each Player's name and the 'performance' indicator (eg. win/loss
     #      ratio)."""
     # def getGameHistory:
@@ -330,67 +361,71 @@ class TictactoeApi(remote.Service):
 
     # # - - - Registration - - - - - - - - - - - - - - - - - - - -
 
-    # @ndb.transactional(xg=True)
-    # def _conferenceRegistration(self, request, reg=True):
-    #     """Register or unregister user for selected conference."""
-    #     retval = None
-    #     prof = self._getProfileFromUser() # get user Profile
+    @ndb.transactional(xg=True)
+    def _gameParticipation(self, request, reg=True):
+        """Register or unregister player for a selected game."""
+        retval = None
+        player = self._getProfileFromPlayer() # get user Profile
 
-    #     # check if conf exists given websafeConfKey
-    #     # get conference; check that it exists
-    #     wsck = request.websafeConferenceKey
-    #     conf = ndb.Key(urlsafe=wsck).get()
-    #     if not conf:
-    #         raise endpoints.NotFoundException(
-    #             'No conference found with key: %s' % wsck)
+        # check if game exists given websafeConfKey
+        g_key = request.websafeGameKey
+        game = ndb.Key(urlsafe=g_key).get()
+        if not game:
+            raise endpoints.NotFoundException(
+                'No game found with key: %s' % g_key)
 
-    #     # register
-    #     if reg:
-    #         # check if user already registered otherwise add
-    #         if wsck in prof.conferenceKeysToAttend:
-    #             raise ConflictException(
-    #                 "You have already registered for this conference")
+        # register
+        if reg:
+            # check if player already registered otherwise add
+            if g_key in player.gamesInProgress:
+                raise ConflictException(
+                    "You have already registered for this game")
 
-    #         # check if seats avail
-    #         if conf.seatsAvailable <= 0:
-    #             raise ConflictException(
-    #                 "There are no seats available.")
+            # check if seats avail
+            if game.seatsAvailable <= 0:
+                raise ConflictException(
+                    "There are no seats available.")
+            else:
+                # register user, take away one seat
+                p_id = self._getIdFromPlayer
+                print 'p-id:', p_id
+                if game.seatsAvailable == 1:
+                    game.playerTwoId = str(p_id)
+                elif game.seatsAvailable == 2:
+                    game.playerOneId = str(p_id)
+                player.gamesInProgress.append(g_key)
+                game.seatsAvailable -= 1
+                retval = True
 
-    #         # register user, take away one seat
-    #         prof.conferenceKeysToAttend.append(wsck)
-    #         conf.seatsAvailable -= 1
-    #         retval = True
+        # unregister, i.e. cancel
+        else:
+            # check if user already registered
+            if g_key in player.gamesInProgress:
+                # cancel player, add back one seat
+                player.gamesInProgress.remove(g_key)
+                game.seatsAvailable += 1
+                retval = True
+            else:
+                retval = False
 
-    #     # unregister
-    #     else:
-    #         # check if user already registered
-    #         if wsck in prof.conferenceKeysToAttend:
+        # write things back to the datastore & return
+        player.put()
+        game.put()
+        return BooleanMessage(data=retval)
 
-    #             # unregister user, add back one seat
-    #             prof.conferenceKeysToAttend.remove(wsck)
-    #             conf.seatsAvailable += 1
-    #             retval = True
-    #         else:
-    #             retval = False
+    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
+            path='game/{websafeGameKey}',
+            http_method='POST', name='joinGame')
+    def joinGame(self, request):
+        """Register player for a selected game."""
+        return self._gameParticipation(request)
 
-    #     # write things back to the datastore & return
-    #     prof.put()
-    #     conf.put()
-    #     return BooleanMessage(data=retval)
-
-    # @endpoints.method(CONF_GET_REQUEST, BooleanMessage,
-    #         path='conference/{websafeConferenceKey}',
-    #         http_method='POST', name='registerForConference')
-    # def registerForConference(self, request):
-    #     """Register user for selected conference."""
-    #     return self._conferenceRegistration(request)
-
-    # @endpoints.method(CONF_GET_REQUEST, BooleanMessage,
-    #         path='conference/{websafeConferenceKey}',
-    #         http_method='DELETE', name='unregisterFromConference')
-    # def unregisterFromConference(self, request):
-    #     """Unregister user for selected conference."""
-    #     return self._conferenceRegistration(request,False)
+    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
+            path='game/{websafeGameKey}',
+            http_method='DELETE', name='leaveGame')
+    def leaveGame(self, request):
+        """Cancel user for a selected game."""
+        return self._gameParticipation(request,False)
 
     @endpoints.method(message_types.VoidMessage, GameForms,
             path='games/active',
@@ -425,17 +460,17 @@ class TictactoeApi(remote.Service):
         """Create Announcement & assign to memcache; used by
         memcache cron job & putAnnouncement().
         """
-        confs = Conference.query(ndb.AND(
-            Conference.seatsAvailable <= 5,
-            Conference.seatsAvailable > 0)
+        games = Game.query(ndb.AND(
+            Game.seatsAvailable == 1,
+            Game.seatsAvailable == 2)
         ) # TODO:get or.fetch(projection=[Conference.name])
-        if confs:
+        if games:
             # If there are almost sold out conferences,
             # format announcement and set it in memcache
             announcement = '%s %s' % (
-                'Last chance to attend! The following conferences '
-                'are nearly sold out:',
-                ', '.join(conf.name for conf in confs))
+                'Come play... The following games '
+                'are ready for you to sign up',
+                ', '.join(game.name for game in games))
             memcache.set(MEMCACHE_ANNOUNCEMENTS_KEY, announcement)
         else:
             # If there are no sold out conferences,
