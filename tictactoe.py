@@ -189,8 +189,7 @@ class TictactoeApi(remote.Service):
                       name='participateGame')
     def participateGame(self, request):
         """
-        registered player participates in a game as either playerOne or
-        playerTwo
+        authorized player participates in a game, can not play against self
         """
         # get the specified game
         print '!!', request.websafeGameKey
@@ -334,26 +333,20 @@ class TictactoeApi(remote.Service):
 
         # register
         if reg:
-            # check if player already registered otherwise add
-            if g_key in player.gamesInProgress:
-                raise ConflictException(
-                    "You have already registered for this game")
-
-            # check if seats avail
-            if game.seatsAvailable <= 0:
+            if game.seatsAvailable <= 0:  # check if seats avail
                 raise ConflictException(
                     "There are no seats available.")
             else:
                 # register user, take away one seat
-                if game.seatsAvailable == 1:
+                if game.seatsAvailable == 1:  #register user
                     game.playerTwoId = player.key.urlsafe()
                 elif game.seatsAvailable == 2:
                     game.playerOneId = player.key.urlsafe()
-                player.gamesInProgress.append(g_key)  # TODO?
-                game.seatsAvailable -= 1
+                player.gamesInProgress.append(g_key)  # update player profile
+                game.seatsAvailable -= 1  # take away 1 seat
                 retval = True
 
-        # unregister, i.e. cancel
+        # unregister
         else:
             # check if user already registered
             if g_key in player.gamesInProgress:
@@ -378,7 +371,7 @@ class TictactoeApi(remote.Service):
                       path='game/{websafeGameKey}',
                       http_method='POST', name='joinGame')
     def joinGame(self, request):
-        """Register player for a selected game."""
+        """Register player for a selected game; can play against self."""
         return self._gameParticipation(request)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
