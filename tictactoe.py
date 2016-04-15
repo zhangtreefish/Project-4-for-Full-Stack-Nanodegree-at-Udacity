@@ -286,7 +286,7 @@ class TictactoeApi(remote.Service):
         for field in gf.all_fields():
             if hasattr(game, field.name):
                 setattr(gf, field.name, getattr(game, field.name))
-            elif field.name == "websafeKey":  # TODO
+            elif field.name == "websafeKey":
                 setattr(gf, field.name, game.key.urlsafe())
         # if displayName:
         #     setattr(gf, 'playerOneName', displayName)
@@ -439,10 +439,9 @@ class TictactoeApi(remote.Service):
             http_method='GET', name='getActiveGames')
     def getActiveGames(self, request):
         """Get a list of games that the player is engaged in."""
-        # TODO:
-        # step 1: get user profile
+        # get user profile
         player = self._getProfileFromPlayer()
-        # step 2: get conferenceKeysToAttend from profile.
+        # get gamesInProgress from profile.
         keys =getattr(player,'gamesInProgress')
         logging.debug('keys')
         if keys is None:
