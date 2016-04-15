@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 from google.appengine.api import memcache
 from models import StringMessage
 from models import BooleanMessage
@@ -12,7 +11,8 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player, GameForm, Game, GameForms, ConflictException
+from models import PlayerForm, PlayerMiniForm, Player
+from models import GameForm, Game, GameForms, ConflictException
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -45,10 +45,11 @@ DEFAULTS = {
     "seatsAvailable": 2
 }
 
-@endpoints.api( name='tictactoe',
-                version='v1',
-                allowed_client_ids=[WEB_CLIENT_ID, API_EXPLORER_CLIENT_ID],
-                scopes=[EMAIL_SCOPE])
+
+@endpoints.api(name='tictactoe',
+               version='v1',
+               allowed_client_ids=[WEB_CLIENT_ID, API_EXPLORER_CLIENT_ID],
+               scopes=[EMAIL_SCOPE])
 class TictactoeApi(remote.Service):
     """Tictactoe API v0.1"""
 
@@ -66,9 +67,12 @@ class TictactoeApi(remote.Service):
         return pf
 
     def _getProfileFromPlayer(self):
-        """Return player Profile from datastore, creating new one if non-existent."""
-        # If the incoming method has a valid auth or ID token, endpoints.get_current_user()
-        # returns a User, otherwise it returns None.
+        """
+        Return player Profile from datastore, creating new one if
+        non-existent.
+        """
+        # If the incoming method has a valid auth or ID token, endpoints.get_
+        # current_user() returns a User, otherwise it returns None.
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -77,20 +81,20 @@ class TictactoeApi(remote.Service):
         player = player_key.get()
         if not player:
             player = Player(
-                key = player_key,
-                displayName = user.nickname(),
-                mainEmail= user.email(),
-                gamesInProgress = [],
-                gamesCompleted = [],
-                winsTotal = 0,
-                gamesTotal = 0)
+                key=player_key,
+                displayName=user.nickname(),
+                mainEmail=user.email(),
+                gamesInProgress=[],
+                gamesCompleted=[],
+                winsTotal=0,
+                gamesTotal=0)
             player.put()
         return player
 
     def _getIdFromPlayer(self):
-        """Return player Id from datastore, creating new one if non-existent."""
-        # If the incoming method has a valid auth or ID token, endpoints.get_current_user()
-        # returns a User, otherwise it returns None.
+        """
+        Return player Id from datastore, creating new one if non-existent.
+        """
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -98,7 +102,9 @@ class TictactoeApi(remote.Service):
         return user_id
 
     def _doProfile(self, edit_request=None):
-        """Get player Profile and return to player, possibly updating it first."""
+        """
+        Get player Profile and return to player, possibly updating it first.
+        """
         # get user Profile
         player = self._getProfileFromPlayer()
 
@@ -114,9 +120,10 @@ class TictactoeApi(remote.Service):
         # return ProfileForm
         return self._copyPlayerToForm(player)
 
-
     @endpoints.method(message_types.VoidMessage, PlayerForm,
-            path='player', http_method='GET', name='getPlayer')
+                      path='player',
+                      http_method='GET',
+                      name='getPlayer')
     def getPlayer(self, request):
         """Return current player profile."""
         return self._doProfile(True)
@@ -124,15 +131,19 @@ class TictactoeApi(remote.Service):
 
 # TODO: not updating
     @endpoints.method(PlayerMiniForm, PlayerForm,
-            path='edit_player', http_method='POST', name='editPlayer')
+                      path='edit_player',
+                      http_method='POST',
+                      name='editPlayer')
     def editPlayer(self, request):
         """Update displayName & profile of the current player"""
         logging.info('saving your profile')
         return self._doProfile(request)
 
-    # @ndb.transactional(xg=True)  # is it needed with the ancestor declaration?
+    # @ndb.transactional(xg=True)  # is it needed with the ancestor?
     @endpoints.method(message_types.VoidMessage, GameForm,
-            path='create_game', http_method='POST', name='createGame')
+                      path='create_game',
+                      http_method='POST',
+                      name='createGame')
     def createGame(self, request):
         """
         create a game
@@ -152,7 +163,7 @@ class TictactoeApi(remote.Service):
         data = {}  # is a dict
         data['key'] = g_key
 
-        # add default values for those missing (both data model & outbound Message)
+        # add default values for the missing(data model & outbound Message)
         # for df in DEFAULTS:
         #     if data[df] is None:
         #         data[df] = DEFAULTS[df]
@@ -165,22 +176,22 @@ class TictactoeApi(remote.Service):
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
-            'gameInfo': repr(request)},
-            url='/tasks/send_confirmation_email'
-        )
+                      'gameInfo': repr(request)},
+                      url='/tasks/send_confirmation_email')
         game = g_key.get()
         print 'game', game
-
-        # player.gamesTotal = player.gamesTotal + 1  # throws TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
-        # displayName = p_key.get().displayName
         gf = self._copyGameToForm(game)
         return gf
 
-
     @endpoints.method(GAME_GET_REQUEST, GameForm,
-            path='participate_game/{websafeGameKey}', http_method='POST', name='participateGame')
+                      path='participate_game/{websafeGameKey}',
+                      http_method='POST',
+                      name='participateGame')
     def participateGame(self, request):
-        """current player participates in a game as either playerOne or playerTwo"""
+        """
+        registered player participates in a game as either playerOne or
+        playerTwo
+        """
         # get the specified game
         print '!!', request.websafeGameKey
         game_key = ndb.Key(urlsafe=request.websafeGameKey)
@@ -208,7 +219,7 @@ class TictactoeApi(remote.Service):
             game.seatsAvailable -= 1
 
         else:
-            raise endpoints.UnauthorizedException('Game has two players already')
+            raise endpoints.UnauthorizedException('Sorry, both spots taken!')
         print 'game!!:', game
         game.put()
         player.put()
@@ -218,27 +229,28 @@ class TictactoeApi(remote.Service):
     # def playGame:
 
     @endpoints.method(message_types.VoidMessage, GameForms,
-            path='games', http_method='GET', name='getPlayerGames')
+                      path='games', http_method='GET', name='getPlayerGames')
     def getPlayerGames(self, request):
         """
         This returns all of a User's active games, including those as playerOne
         AND as playerTwo.
         """
         player = self._getProfileFromPlayer()
-        games_as_pl_one = Game.query(Game.playerOneId==player.key.urlsafe()).fetch()
-        games_as_pl_two = Game.query(Game.playerTwoId==player.key.urlsafe()).fetch()
+        g_one = Game.query(Game.playerOneId == player.key.urlsafe()).fetch()
+        g_two = Game.query(Game.playerTwoId == player.key.urlsafe()).fetch()
         # if player_two_games:
         #     for game in player_two_games:
         #         if game not in games:
         #             games.append(game)
-        games = list(games_as_pl_one)
-        games.extend(g for g in games_as_pl_two if g not in games_as_pl_one)
+        games = list(g_one)
+        games.extend(g for g in g_two if g not in g_one)
         return GameForms(
             items=[self._copyGameToForm(game) for game in games])
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-            path='delete_game/{websafeGameKey}', http_method='DELETE',
-            name='deleteGame')
+                      path='delete_game/{websafeGameKey}',
+                      http_method='DELETE',
+                      name='deleteGame')
     def deleteGame(self, request):
         """
         allows either player to cancel a game in progress, implemented by
@@ -259,11 +271,11 @@ class TictactoeApi(remote.Service):
             # game_key.delete()
             cancelled = True
             db.delete(game_key)
-        return BooleanMessage(data =cancelled)
+        return BooleanMessage(data=cancelled)
 
     @endpoints.method(message_types.VoidMessage, BooleanMessage,
-            path='delete_all_games', http_method='DELETE',
-            name='deleteAllGames')
+                      path='delete_all_games', http_method='DELETE',
+                      name='deleteAllGames')
     def deleteAllGames(self, request):
         """
         deleting all Games created by current player
@@ -271,7 +283,7 @@ class TictactoeApi(remote.Service):
 
         ndb.delete_multi(Game.query().fetch(keys_only=True))
         deleted = True
-        return BooleanMessage(data =deleted)
+        return BooleanMessage(data=deleted)
 
         # def getPlayerRankings:
     #     """ each Player's name and the 'performance' indicator (eg. win/loss
@@ -294,8 +306,8 @@ class TictactoeApi(remote.Service):
         return gf
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
-            path='game/{websafeGameKey}',
-            http_method='GET', name='getGame')
+                      path='game/{websafeGameKey}',
+                      http_method='GET', name='getGame')
     def getGame(self, request):
         """Return requested game (by websafeGameKey)."""
         # get Game object from request; bail if not found
@@ -303,70 +315,15 @@ class TictactoeApi(remote.Service):
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: %s' % request.websafeGameKey)
-        player = game.key.parent().get()
-        logging.debug('player')
-        logging.debug(player)
         # return ConferenceForm
         return self._copyGameToForm(game)
 
-
-    # def _getQuery(self, request):
-    #     """Return formatted query from the submitted filters."""
-    #     q = Conference.query()
-    #     inequality_filter, filters = self._formatFilters(request.filters)
-
-    #     # If exists, sort on inequality filter first
-    #     if not inequality_filter:
-    #         q = q.order(Conference.name)
-    #     else:
-    #         q = q.order(ndb.GenericProperty(inequality_filter))
-    #         q = q.order(Conference.name)
-
-    #     for filtr in filters:
-    #         if filtr["field"] in ["month", "maxAttendees"]:
-    #             filtr["value"] = int(filtr["value"])
-    #         formatted_query = ndb.query.FilterNode(filtr["field"], filtr["operator"], filtr["value"])
-    #         q = q.filter(formatted_query)
-    #     return q
-
-
-    # def _formatFilters(self, filters):
-    #     """Parse, check validity and format user-supplied filters."""
-    #     formatted_filters = []
-    #     inequality_field = None
-
-    #     for f in filters:
-    #         print 'f.all_fields()', f.all_fields()
-    #         logging.debug('f.all_fields()')
-    #         logging.debug(f.all_fields())
-    #         filtr = {field.name: getattr(f, field.name) for field in f.all_fields()}
-
-    #         try:
-    #             filtr["field"] = FIELDS[filtr["field"]]
-    #             filtr["operator"] = OPERATORS[filtr["operator"]]
-    #         except KeyError:
-    #             raise endpoints.BadRequestException("Filter contains invalid field or operator.")
-
-    #         # Every operation except "=" is an inequality
-    #         if filtr["operator"] != "=":
-    #             # check if inequality operation has been used in previous filters
-    #             # disallow the filter if inequality was performed on a different field before
-    #             # track the field on which the inequality operation is performed
-    #             if inequality_field and inequality_field != filtr["field"]:
-    #                 raise endpoints.BadRequestException("Inequality filter is allowed on only one field.")
-    #             else:
-    #                 inequality_field = filtr["field"]
-
-    #         formatted_filters.append(filtr)
-    #     return (inequality_field, formatted_filters)
-
     # # - - - Registration - - - - - - - - - - - - - - - - - - - -
-
     @ndb.transactional(xg=True)
     def _gameParticipation(self, request, reg=True):
         """Register or unregister player for a selected game."""
         retval = None
-        player = self._getProfileFromPlayer() # get user Profile
+        player = self._getProfileFromPlayer()  # get user Profile
 
         # check if game exists given websafeConfKey
         g_key = request.websafeGameKey
@@ -388,14 +345,11 @@ class TictactoeApi(remote.Service):
                     "There are no seats available.")
             else:
                 # register user, take away one seat
-                p_id = self._getIdFromPlayer
-
-                print 'p-id:', p_id
                 if game.seatsAvailable == 1:
                     game.playerTwoId = player.key.urlsafe()
                 elif game.seatsAvailable == 2:
                     game.playerOneId = player.key.urlsafe()
-                player.gamesInProgress.append(g_key)
+                player.gamesInProgress.append(g_key)  # TODO?
                 game.seatsAvailable -= 1
                 retval = True
 
@@ -421,46 +375,40 @@ class TictactoeApi(remote.Service):
         return BooleanMessage(data=retval)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-            path='game/{websafeGameKey}',
-            http_method='POST', name='joinGame')
+                      path='game/{websafeGameKey}',
+                      http_method='POST', name='joinGame')
     def joinGame(self, request):
         """Register player for a selected game."""
         return self._gameParticipation(request)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-            path='game/{websafeGameKey}',
-            http_method='DELETE', name='leaveGame')
+                      path='game/{websafeGameKey}',
+                      http_method='DELETE', name='leaveGame')
     def leaveGame(self, request):
         """Cancel user for a selected game."""
-        return self._gameParticipation(request,False)
+        return self._gameParticipation(request, False)
 
     @endpoints.method(message_types.VoidMessage, GameForms,
-            path='games/active',
-            http_method='GET', name='getActiveGames')
+                      path='games/active',
+                      http_method='GET', name='getActiveGames')
     def getActiveGames(self, request):
         """Get a list of games that the player is engaged in."""
         # get user profile
         player = self._getProfileFromPlayer()
         # get gamesInProgress from profile.
-        keys =getattr(player,'gamesInProgress')
+        keys = getattr(player, 'gamesInProgress')
         logging.debug('keys')
         if keys is None:
             raise endpoints.NotFoundException(
                 'You have 0 gamesInProgress')
         else:
-        # TODO
-        # to make a ndb key from websafe key you can use:
-        # ndb.Key(urlsafe=my_websafe_key_string)
-            safe_keys=[]
-            for key in keys:
+            safe_keys = []
+            for key in keys:  # to make key from wsks:ndb.Key(urlsafe=wsks)
                 safe_keys.append(ndb.Key(urlsafe=key))
-            # step 3: fetch conferences from datastore.
-            # Use get_multi(array_of_keys) to fetch all keys at once.
-            # Do not fetch them one by one!
-            games = ndb.get_multi(safe_keys)
+            games = ndb.get_multi(safe_keys)  # to fetch all keys at once
             if games:
-                # return set of ConferenceForm objects per Conference
-                return GameForms(items=[self._copyGameToForm(game) for game in games])
+                return GameForms(
+                    items=[self._copyGameToForm(game) for game in games])
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod
@@ -471,9 +419,9 @@ class TictactoeApi(remote.Service):
         games = Game.query(ndb.AND(
             Game.seatsAvailable == 1,
             Game.seatsAvailable == 2)
-        ) # TODO:get or.fetch(projection=[Conference.name])
+        )  # TODO:get or.fetch(projection=[Conference.name])
         if games:
-            # If there are almost sold out conferences,
+            # If there are games ready for sign up,
             # format announcement and set it in memcache
             announcement = '%s %s' % (
                 'Come play... The following games '
@@ -488,10 +436,9 @@ class TictactoeApi(remote.Service):
 
         return announcement
 
-
     @endpoints.method(message_types.VoidMessage, StringMessage,
-            path='tictactoe/announcement/get',
-            http_method='GET', name='getAnnouncement')
+                      path='tictactoe/announcement/get',
+                      http_method='GET', name='getAnnouncement')
     def getAnnouncement(self, request):
         """Return Announcement from memcache."""
         # TODO 1

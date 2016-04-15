@@ -5,9 +5,11 @@ import endpoints
 from protorpc import messages
 from google.appengine.ext import ndb
 
+
 class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
+
 
 class Player(ndb.Model):
     """Player kind, to represent player profile"""
@@ -19,6 +21,7 @@ class Player(ndb.Model):
     gamesCompleted = ndb.StringProperty(repeated=True)
     # winsTotal = ndb.IntegerProperty()
     # gamesTotal = ndb.IntegerProperty()
+
 
 class Game(ndb.Model):
     """Game kind, to generate game entities with"""
@@ -38,9 +41,11 @@ class Game(ndb.Model):
     gameOver = ndb.BooleanProperty()
     # gameCancelled = ndb.BooleanProperty()
 
+
 class PlayerMiniForm(messages.Message):
     """ as inbound request message"""
     displayName = messages.StringField(1)
+
 
 class PlayerForm(messages.Message):
     """as outbound response message"""
@@ -51,6 +56,7 @@ class PlayerForm(messages.Message):
     gamesCompleted = messages.StringField(5, repeated=True)
     # winsTotal = messages.IntegerField(6)
     # gamesTotal = messages.IntegerField(7)
+
 
 class GameForm(messages.Message):
     """outbound form message as response object"""
@@ -76,9 +82,11 @@ class MoveForm(messages.Message):
     playerId = messages.StringField(1)
     positionPlayed = messages.StringField(2)
 
+
 class GameForms(messages.Message):
     """ multiple game outbound form message as response object"""
     items = messages.MessageField(GameForm, 1, repeated=True)
+
 
 class GameQueryForm(messages.Message):
     """ as request object-- query inbound form message"""
@@ -86,19 +94,23 @@ class GameQueryForm(messages.Message):
     operator = messages.StringField(2)
     value = messages.StringField(3)
 
+
 class GameQueryForms(messages.Message):
     """ as request object-- multiple GameQueryForm inbound form message"""
     filters = messages.MessageField(GameQueryForm, 1, repeated=True)
 
+
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
+
 
 class GamePiece(messages.Enum):
     """-- one of the two players enumeration value"""
     NOT_SPECIFIED = 1
     Red = 2
     Blue = 3
+
 
 # needed for conference registration
 class BooleanMessage(messages.Message):
