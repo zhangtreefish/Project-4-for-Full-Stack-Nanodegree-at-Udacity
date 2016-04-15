@@ -6,13 +6,34 @@ from protorpc import messages
 from google.appengine.ext import ndb
 
 
+class PlayerNumber(messages.Enum):
+    """To denote the player and game piece during the moves"""
+    NOT_SPECIFIED = 1
+    One = 2
+    Two = 3
+
+
+class PositionNumber(messages.Enum):
+    """To denote the player and game piece during the moves"""
+    NOT_SPECIFIED = 1
+    OneA = 2
+    OneB = 3
+    OneC = 4
+    TwoA = 5
+    TwoB = 6
+    TwoC = 7
+    ThreeA = 8
+    ThreeB = 9
+    ThreeC = 10
+
+
 class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
 
 
 class Player(ndb.Model):
-    """Player kind, to represent player profile"""
+    """A Kind to represent player profile"""
     # Id = ndb.StringProperty()  # Should  Id be here or not?
     # use MD5 hash of the email to use as id
     displayName = ndb.StringProperty()
@@ -23,12 +44,18 @@ class Player(ndb.Model):
     # gamesTotal = ndb.IntegerProperty()
 
 
+class Move(ndb.Model):
+    """A Kind to record each move of a Game, call with Game as parent"""
+    moveNumber = ndb.IntegerProperty()
+    playerNumber = ndb.StringProperty()
+    positionTaken = ndb.StringProperty()
+
+
 class Game(ndb.Model):
-    """Game kind, to generate game entities with"""
+    """A Kind for Game, instantiate with Player as parent"""
     seatsAvailable = ndb.IntegerProperty()
     playerOneId = ndb.StringProperty()
     playerTwoId = ndb.StringProperty()
-    gameCurrentMove = ndb.IntegerProperty()
     positionOneA = ndb.StringProperty()
     positionOneB = ndb.StringProperty()
     positionOneC = ndb.StringProperty()
@@ -38,8 +65,18 @@ class Game(ndb.Model):
     positionThreeA = ndb.StringProperty()
     positionThreeB = ndb.StringProperty()
     positionThreeC = ndb.StringProperty()
+    moveLogs = ndb.StructuredProperty(Move, repeated=True)
+    gameCurrentMove = ndb.IntegerProperty()
+    playerCurrentTurn = ndb.StringProperty()
     gameOver = ndb.BooleanProperty()
     # gameCancelled = ndb.BooleanProperty()
+
+
+class MoveForm(messages.Message):
+    """outbound form message as response object after making a move"""
+    moveNumber = messages.IntegerField(1)
+    playerNumber = messages.EnumField(PlayerNumber, 2)
+    positionTaken = messages.EnumField(PositionNumber, 3)
 
 
 class PlayerMiniForm(messages.Message):
@@ -60,27 +97,23 @@ class PlayerForm(messages.Message):
 
 class GameForm(messages.Message):
     """outbound form message as response object"""
-    playerOneId = messages.StringField(1)
-    playerTwoId = messages.StringField(2)
-    gameCurrentMove = messages.IntegerField(3)
-    position1A = messages.StringField(4)
-    position1B = messages.StringField(5)
-    position1C = messages.StringField(6)
-    position2A = messages.StringField(7)
-    position2B = messages.StringField(8)
-    position2C = messages.StringField(9)
-    position3A = messages.StringField(10)
-    position3B = messages.StringField(11)
-    position3C = messages.StringField(12)
+    seatsAvailable = messages.IntegerField(1)
+    playerOneId = messages.StringField(2)
+    playerTwoId = messages.StringField(3)
+    position1A = messages.EnumField(PlayerNumber, 4)
+    position1B = messages.EnumField(PlayerNumber, 5)
+    position1C = messages.EnumField(PlayerNumber, 6)
+    position2A = messages.EnumField(PlayerNumber, 7)
+    position2B = messages.EnumField(PlayerNumber, 8)
+    position2C = messages.EnumField(PlayerNumber, 9)
+    position3A = messages.EnumField(PlayerNumber, 10)
+    position3B = messages.EnumField(PlayerNumber, 11)
+    position3C = messages.EnumField(PlayerNumber, 12)
     gameOver = messages.BooleanField(13)
-    websafeKey = messages.StringField(14)
-    seatsAvailable = messages.IntegerField(15)
-
-
-class MoveForm(messages.Message):
-    """inbound form message as request object for making a move"""
-    playerId = messages.StringField(1)
-    positionPlayed = messages.StringField(2)
+    gameCurrentMove = messages.IntegerField(14)
+    websafeKey = messages.StringField(15)
+    playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
+    moveLogs = messages.MessageField(MoveForm, 17, repeated=True)
 
 
 class GameForms(messages.Message):
@@ -103,13 +136,6 @@ class GameQueryForms(messages.Message):
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
-
-
-class GamePiece(messages.Enum):
-    """-- one of the two players enumeration value"""
-    NOT_SPECIFIED = 1
-    Red = 2
-    Blue = 3
 
 
 # needed for conference registration

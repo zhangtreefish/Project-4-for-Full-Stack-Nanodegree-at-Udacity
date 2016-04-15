@@ -11,20 +11,26 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player
-from models import GameForm, Game, GameForms, ConflictException
+from models import PlayerForm, PlayerMiniForm, Player, ConflictException
+from models import GameForm, Game, GameForms, Move, MoveForm, ConflictException
+from models import PositionNumber, PlayerNumber
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
-PLAYER_REQUEST = endpoints.ResourceContainer(
-    message_types.VoidMessage,
-    user_name=messages.StringField(1),
-    email=messages.StringField(2))
+# PLAYER_REQUEST = endpoints.ResourceContainer(
+#     message_types.VoidMessage,
+#     user_name=messages.StringField(1),
+#     email=messages.StringField(2))
 GAME_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
+)
+GAME_MOVE_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeGameKey=messages.StringField(1),
+    positionTaken=messages.EnumField(PositionNumber, 2)
 )
 # GAME_GET_REQUEST = endpoints.ResourceContainer(
 #     message_types.VoidMessage,
@@ -42,7 +48,8 @@ DEFAULTS = {
     "positionThreeB": '',
     "positionThreeC": '',
     "gameCurrentMove": 0,
-    "seatsAvailable": 2
+    "seatsAvailable": 2,
+    "moveLogs": []
 }
 
 
@@ -128,8 +135,6 @@ class TictactoeApi(remote.Service):
         """Return current player profile."""
         return self._doProfile(True)
 
-
-# TODO: not updating
     @endpoints.method(PlayerMiniForm, PlayerForm,
                       path='edit_player',
                       http_method='POST',
@@ -139,7 +144,6 @@ class TictactoeApi(remote.Service):
         logging.info('saving your profile')
         return self._doProfile(request)
 
-    # @ndb.transactional(xg=True)  # is it needed with the ancestor?
     @endpoints.method(message_types.VoidMessage, GameForm,
                       path='create_game',
                       http_method='POST',
@@ -173,6 +177,7 @@ class TictactoeApi(remote.Service):
         # data['gameCancelled'] = False
         data['gameCurrentMove'] = 0
         data['seatsAvailable'] = 2
+        data['moveLogs'] = []
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
@@ -195,7 +200,6 @@ class TictactoeApi(remote.Service):
         print '!!', request.websafeGameKey
         game_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = game_key.get()
-        print 'game!!:', game
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: %s' % request.websafeGameKey)
@@ -219,13 +223,58 @@ class TictactoeApi(remote.Service):
 
         else:
             raise endpoints.UnauthorizedException('Sorry, both spots taken!')
-        print 'game!!:', game
         game.put()
         player.put()
 
         return self._copyGameToForm(game)
 
-    # def playGame:
+    def _copyMoveToForm(self, move):
+        """Copy relevant fields from Move to MoveForm."""
+        mf = MoveForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        for field in mf.all_fields():
+            if hasattr(move, field.name):
+                setattr(mf, field.name, getattr(move, field.name))
+        mf.check_initialized()
+        return mf
+
+    @endpoints.method(GAME_MOVE_REQUEST, MoveForm,
+                      path='make_move/{websafeGameKey}/{positionTaken}',
+                      http_method='POST',
+                      name='makeMove')
+    def makeMove(self, request):
+        """
+        a player makes a move, update MoveForm, GameForm, Game, and if done:
+        Player and PlayerForm
+        """
+        g_key = ndb.Key(urlsafe=request.websafeGameKey)
+        game = g_key.get()
+        print 'request!!!', request
+        m_id = Move.allocate_ids(size=1, parent=g_key)[0]
+        # make Game key from ID
+        m_key = ndb.Key(Move, m_id, parent=g_key)
+        # build a move
+        data = {}
+        game.gameCurrentMove += 1
+        data['moveNumber'] = game.gameCurrentMove
+        if game.gameCurrentMove%2 == 1:
+            data['playerNumber'] = 'One'
+        elif game.gameCurrentMove%2 == 0:
+            data['playerNumber'] = 'Two'
+        # print 'request.positionTaken.val()', request.positionTaken.value()
+        data['positionTaken'] = str(request.positionTaken)
+        Move(**data).put()
+
+        move = m_key.get()
+        print 'move', move
+        logging.debug('move')
+        logging.debug(move)
+        mf = self._copyMoveToForm(move)
+        # TODO: GameForm, Game, and if done: Player and PlayerForm
+
+        return mf
+
 
     @endpoints.method(message_types.VoidMessage, GameForms,
                       path='games', http_method='GET', name='getPlayerGames')
@@ -267,9 +316,7 @@ class TictactoeApi(remote.Service):
             raise endpoints.UnauthorizedException('Only players can cancel \
                 games')
         else:
-            # game_key.delete()
-            cancelled = True
-            db.delete(game_key)
+            db.delete(game_key)  # game_key.delete() does not work
         return BooleanMessage(data=cancelled)
 
     @endpoints.method(message_types.VoidMessage, BooleanMessage,
