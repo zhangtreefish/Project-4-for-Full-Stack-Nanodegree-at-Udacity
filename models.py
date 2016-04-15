@@ -56,7 +56,7 @@ class GameForm(messages.Message):
     """outbound form message as response object"""
     playerOneId = messages.StringField(1)
     playerTwoId = messages.StringField(2)
-    gameMoves = messages.IntegerField(3)
+    gameCurrentMove = messages.IntegerField(3)
     position1A = messages.StringField(4)
     position1B = messages.StringField(5)
     position1C = messages.StringField(6)

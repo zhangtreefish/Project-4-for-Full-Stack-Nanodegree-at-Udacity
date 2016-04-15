@@ -191,17 +191,20 @@ class TictactoeApi(remote.Service):
                 'No game found with key: %s' % request.websafeGameKey)
         # get the authorized user id
         player = self._getProfileFromPlayer()
-
+        # check if the player has already signed up
+        if game_key.urlsafe() in player.gamesInProgress:
+                raise ConflictException(
+                    "You have already registered for this game")
         # update the specified game
         user_id = self._getIdFromPlayer()
         if game.playerOneId is None:
-            game.playerOneId = str(user_id)
-            player.gamesInProgress.append(game_key)
+            game.playerOneId = player.key.urlsafe()
+            player.gamesInProgress.append(game_key.urlsafe())
             game.seatsAvailable -= 1
 
         elif game.playerTwoId is None:
-            game.playerTwoId = str(user_id)
-            player.gamesInProgress.append(game_key)
+            game.playerTwoId = player.key.urlsafe()
+            player.gamesInProgress.append(game_key.urlsafe())
             game.seatsAvailable -= 1
 
         else:
@@ -221,17 +224,15 @@ class TictactoeApi(remote.Service):
         This returns all of a User's active games, including those as playerOne
         AND as playerTwo.
         """
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
-        p_key = ndb.Key(Player, user_id)
-        games = Game.query(ancestor=p_key).fetch()
-        player_two_games = Game.query(Game.playerTwoId==user_id).fetch()
-        if player_two_games:
-            for game in player_two_games:
-                if game not in games:
-                    games.append(game)
+        player = self._getProfileFromPlayer()
+        games_as_pl_one = Game.query(Game.playerOneId==player.key.urlsafe()).fetch()
+        games_as_pl_two = Game.query(Game.playerTwoId==player.key.urlsafe()).fetch()
+        # if player_two_games:
+        #     for game in player_two_games:
+        #         if game not in games:
+        #             games.append(game)
+        games = list(games_as_pl_one)
+        games.extend(g for g in games_as_pl_two if g not in games_as_pl_one)
         return GameForms(
             items=[self._copyGameToForm(game) for game in games])
 
@@ -388,11 +389,12 @@ class TictactoeApi(remote.Service):
             else:
                 # register user, take away one seat
                 p_id = self._getIdFromPlayer
+
                 print 'p-id:', p_id
                 if game.seatsAvailable == 1:
-                    game.playerTwoId = str(p_id)
+                    game.playerTwoId = player.key.urlsafe()
                 elif game.seatsAvailable == 2:
-                    game.playerOneId = str(p_id)
+                    game.playerOneId = player.key.urlsafe()
                 player.gamesInProgress.append(g_key)
                 game.seatsAvailable -= 1
                 retval = True
@@ -404,6 +406,11 @@ class TictactoeApi(remote.Service):
                 # cancel player, add back one seat
                 player.gamesInProgress.remove(g_key)
                 game.seatsAvailable += 1
+                # update game's player status
+                if player.key.urlsafe() == game.playerOneId:
+                    game.playerOneId = None
+                if player.key.urlsafe() == game.playerTwoId:
+                    game.playerTwoId = None
                 retval = True
             else:
                 retval = False
@@ -434,25 +441,27 @@ class TictactoeApi(remote.Service):
         """Get a list of games that the player is engaged in."""
         # TODO:
         # step 1: get user profile
-        prof = self._getProfileFromUser()
+        player = self._getProfileFromPlayer()
         # step 2: get conferenceKeysToAttend from profile.
-        keys =getattr(prof,'conferenceKeysToAttend')
+        keys =getattr(player,'gamesInProgress')
         logging.debug('keys')
-
+        if keys is None:
+            raise endpoints.NotFoundException(
+                'You have 0 gamesInProgress')
+        else:
         # TODO
         # to make a ndb key from websafe key you can use:
         # ndb.Key(urlsafe=my_websafe_key_string)
-        safe_keys=[]
-        for key in keys:
-            safe_keys.append(ndb.Key(urlsafe=key))
-        # step 3: fetch conferences from datastore.
-        # Use get_multi(array_of_keys) to fetch all keys at once.
-        # Do not fetch them one by one!
-        conferences = ndb.get_multi(safe_keys)
-        # return set of ConferenceForm objects per Conference
-        return ConferenceForms(items=[self._copyConferenceToForm(conf, "")\
-         for conf in conferences]
-        )
+            safe_keys=[]
+            for key in keys:
+                safe_keys.append(ndb.Key(urlsafe=key))
+            # step 3: fetch conferences from datastore.
+            # Use get_multi(array_of_keys) to fetch all keys at once.
+            # Do not fetch them one by one!
+            games = ndb.get_multi(safe_keys)
+            if games:
+                # return set of ConferenceForm objects per Conference
+                return GameForms(items=[self._copyGameToForm(game) for game in games])
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod
