@@ -16,15 +16,15 @@ class PlayerNumber(messages.Enum):
 class PositionNumber(messages.Enum):
     """To denote the player and game piece during the moves"""
     NOT_SPECIFIED = 1
-    OneA = 2
-    OneB = 3
-    OneC = 4
-    TwoA = 5
-    TwoB = 6
-    TwoC = 7
-    ThreeA = 8
-    ThreeB = 9
-    ThreeC = 10
+    position1A = 2
+    position1B = 3
+    position1C = 4
+    position2A = 5
+    position2B = 6
+    position2C = 7
+    position3A = 8
+    position3B = 9
+    position3C = 10
 
 
 class ConflictException(endpoints.ServiceException):
@@ -38,7 +38,7 @@ class Player(ndb.Model):
     # use MD5 hash of the email to use as id
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
-    gamesInProgress = ndb.StringProperty(repeated=True)
+    gamesInProgress = ndb.StringProperty(repeated=True)  # games that she plays
     gamesCompleted = ndb.StringProperty(repeated=True)
     # winsTotal = ndb.IntegerProperty()
     # gamesTotal = ndb.IntegerProperty()
@@ -56,18 +56,18 @@ class Game(ndb.Model):
     seatsAvailable = ndb.IntegerProperty()
     playerOneId = ndb.StringProperty()
     playerTwoId = ndb.StringProperty()
-    positionOneA = ndb.StringProperty()
-    positionOneB = ndb.StringProperty()
-    positionOneC = ndb.StringProperty()
-    positionTwoA = ndb.StringProperty()
-    positionTwoB = ndb.StringProperty()
-    positionTwoC = ndb.StringProperty()
-    positionThreeA = ndb.StringProperty()
-    positionThreeB = ndb.StringProperty()
-    positionThreeC = ndb.StringProperty()
-    moveLogs = ndb.StructuredProperty(Move, repeated=True)
+    position1A = ndb.StringProperty()
+    position1B = ndb.StringProperty()
+    position1C = ndb.StringProperty()
+    position2A = ndb.StringProperty()
+    position2B = ndb.StringProperty()
+    position2C = ndb.StringProperty()
+    position3A = ndb.StringProperty()
+    position3B = ndb.StringProperty()
+    position3C = ndb.StringProperty()
+    # moveLogs = ndb.StructuredProperty(Move, repeated=True)
     gameCurrentMove = ndb.IntegerProperty()
-    playerCurrentTurn = ndb.StringProperty()
+    # playerCurrentTurn = ndb.StringProperty()
     gameOver = ndb.BooleanProperty()
     # gameCancelled = ndb.BooleanProperty()
 
@@ -100,20 +100,21 @@ class GameForm(messages.Message):
     seatsAvailable = messages.IntegerField(1)
     playerOneId = messages.StringField(2)
     playerTwoId = messages.StringField(3)
-    position1A = messages.EnumField(PlayerNumber, 4)
-    position1B = messages.EnumField(PlayerNumber, 5)
-    position1C = messages.EnumField(PlayerNumber, 6)
-    position2A = messages.EnumField(PlayerNumber, 7)
-    position2B = messages.EnumField(PlayerNumber, 8)
-    position2C = messages.EnumField(PlayerNumber, 9)
-    position3A = messages.EnumField(PlayerNumber, 10)
-    position3B = messages.EnumField(PlayerNumber, 11)
-    position3C = messages.EnumField(PlayerNumber, 12)
+    # position1A = messages.EnumField(PlayerNumber, 4)
+    position1A = messages.StringField(4)
+    position1B = messages.StringField(5)
+    position1C = messages.StringField(6)
+    position2A = messages.StringField(7)
+    position2B = messages.StringField(8)
+    position2C = messages.StringField(9)
+    position3A = messages.StringField(10)
+    position3B = messages.StringField(11)
+    position3C = messages.StringField(12)
     gameOver = messages.BooleanField(13)
     gameCurrentMove = messages.IntegerField(14)
     websafeKey = messages.StringField(15)
-    playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
-    moveLogs = messages.MessageField(MoveForm, 17, repeated=True)
+    # playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
+    # moveLogs = messages.MessageField(MoveForm, 16, repeated=True)
 
 
 class GameForms(messages.Message):

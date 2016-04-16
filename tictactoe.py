@@ -127,6 +127,30 @@ class TictactoeApi(remote.Service):
         # return ProfileForm
         return self._copyPlayerToForm(player)
 
+    def _copyGameToForm(self, game):
+        """Copy relevant fields from Game to GameForm."""
+        gf = GameForm()
+        for field in gf.all_fields():
+            if hasattr(game, field.name):
+                setattr(gf, field.name, getattr(game, field.name))
+            elif field.name == "websafeKey":
+                setattr(gf, field.name, game.key.urlsafe())
+        # if displayName:
+        #     setattr(gf, 'playerOneName', displayName)
+        gf.check_initialized()
+        return gf
+
+    def _copyMoveToForm(self, move):
+        """Copy relevant fields from Move to MoveForm."""
+        mf = MoveForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        for field in mf.all_fields():
+            if hasattr(move, field.name):
+                setattr(mf, field.name, getattr(move, field.name))
+        mf.check_initialized()
+        return mf
+
     @endpoints.method(message_types.VoidMessage, PlayerForm,
                       path='player',
                       http_method='GET',
@@ -228,60 +252,12 @@ class TictactoeApi(remote.Service):
 
         return self._copyGameToForm(game)
 
-    def _copyMoveToForm(self, move):
-        """Copy relevant fields from Move to MoveForm."""
-        mf = MoveForm()
-        # all_fields: Gets all field definition objects. Returns an iterator
-        # over all values in arbitrary order.
-        for field in mf.all_fields():
-            if hasattr(move, field.name):
-                setattr(mf, field.name, getattr(move, field.name))
-        mf.check_initialized()
-        return mf
-
-    @endpoints.method(GAME_MOVE_REQUEST, MoveForm,
-                      path='make_move/{websafeGameKey}/{positionTaken}',
-                      http_method='POST',
-                      name='makeMove')
-    def makeMove(self, request):
-        """
-        a player makes a move, update MoveForm, GameForm, Game, and if done:
-        Player and PlayerForm
-        """
-        g_key = ndb.Key(urlsafe=request.websafeGameKey)
-        game = g_key.get()
-        print 'request!!!', request
-        m_id = Move.allocate_ids(size=1, parent=g_key)[0]
-        # make Game key from ID
-        m_key = ndb.Key(Move, m_id, parent=g_key)
-        # build a move
-        data = {}
-        game.gameCurrentMove += 1
-        data['moveNumber'] = game.gameCurrentMove
-        if game.gameCurrentMove%2 == 1:
-            data['playerNumber'] = 'One'
-        elif game.gameCurrentMove%2 == 0:
-            data['playerNumber'] = 'Two'
-        # print 'request.positionTaken.val()', request.positionTaken.value()
-        data['positionTaken'] = str(request.positionTaken)
-        Move(**data).put()
-
-        move = m_key.get()
-        print 'move', move
-        logging.debug('move')
-        logging.debug(move)
-        mf = self._copyMoveToForm(move)
-        # TODO: GameForm, Game, and if done: Player and PlayerForm
-
-        return mf
-
-
     @endpoints.method(message_types.VoidMessage, GameForms,
                       path='games', http_method='GET', name='getPlayerGames')
     def getPlayerGames(self, request):
         """
-        This returns all of a User's active games, including those as playerOne
-        AND as playerTwo.
+        This returns all games a player has signed up for, either as playerOne
+        or as playerTwo.
         """
         player = self._getProfileFromPlayer()
         g_one = Game.query(Game.playerOneId == player.key.urlsafe()).fetch()
@@ -337,19 +313,6 @@ class TictactoeApi(remote.Service):
     # def getGameHistory:
     #     """ a 'history' of the moves for each game"""
 # - - - Conference objects - - - - - - - - - - - - - - - - -
-
-    def _copyGameToForm(self, game):
-        """Copy relevant fields from Game to GameForm."""
-        gf = GameForm()
-        for field in gf.all_fields():
-            if hasattr(game, field.name):
-                setattr(gf, field.name, getattr(game, field.name))
-            elif field.name == "websafeKey":
-                setattr(gf, field.name, game.key.urlsafe())
-        # if displayName:
-        #     setattr(gf, 'playerOneName', displayName)
-        gf.check_initialized()
-        return gf
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='game/{websafeGameKey}',
@@ -428,11 +391,62 @@ class TictactoeApi(remote.Service):
         """Cancel user for a selected game."""
         return self._gameParticipation(request, False)
 
+    @endpoints.method(GAME_MOVE_REQUEST, GameForm,
+                      path='make_move/{websafeGameKey}/{positionTaken}',
+                      http_method='POST',
+                      name='makeMove')
+    def makeMove(self, request):
+        """
+        authorized player makes a move: create a move, update Game, and if
+        completed update Player
+        """
+        g_key = ndb.Key(urlsafe=request.websafeGameKey)
+        # create a move
+        m_id = Move.allocate_ids(size=1, parent=g_key)[0]
+        m_key = ndb.Key(Move, m_id, parent=g_key)
+        print 'm_key', m_key.urlsafe()
+        data = {}
+        data['key'] = m_key
+        game = g_key.get()
+        game.gameCurrentMove += 1
+        data['moveNumber'] = game.gameCurrentMove
+        if game.gameCurrentMove%2 == 1:
+            data['playerNumber'] = 'One'
+        elif game.gameCurrentMove%2 == 0:
+            data['playerNumber'] = 'Two'
+        data['positionTaken'] = str(request.positionTaken)
+        Move(**data).put()
+        move = m_key.get()
+        # setattr(move, 'moveNumber', getattr(game, 'gameCurrentMove'))
+        # setattr(move, 'positionTaken', str(request.positionTaken))
+        # if game.gameCurrentMove%2 == 1:
+        #     setattr(move, 'playerNumber', 'One')
+        # elif game.gameCurrentMove%2 == 0:
+        #     setattr(move, 'playerNumber', 'Two')
+        logging.debug('move_b')
+        logging.debug(move)
+        move.put()
+        logging.debug('move_af')
+        logging.debug(move)
+
+        # Update rest of the Game besides gameCurrentMove
+        # game.moveLogs.append(move)
+        # gameOver = ndb.BooleanProperty()
+        player = self._getProfileFromPlayer()
+        setattr(game, str(request.positionTaken), getattr(player, 'displayName'))
+        game.put()
+
+        # update player
+        # player.gamesInProgress.append(game)
+        # TODO: if done: update Player and Game
+
+        return self._copyGameToForm(game)
+
     @endpoints.method(message_types.VoidMessage, GameForms,
-                      path='games/active',
+                      path='games_active',
                       http_method='GET', name='getActiveGames')
     def getActiveGames(self, request):
-        """Get a list of games that the player is engaged in."""
+        """Get a list of games that the player has made moves in."""
         # get user profile
         player = self._getProfileFromPlayer()
         # get gamesInProgress from profile.
