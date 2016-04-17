@@ -47,8 +47,7 @@ DEFAULTS = {
     "positionThreeB": '',
     "positionThreeC": '',
     "gameCurrentMove": 0,
-    "seatsAvailable": 2,
-    "moveLogs": []
+    "seatsAvailable": 2
 }
 
 
@@ -91,9 +90,7 @@ class TictactoeApi(remote.Service):
                 displayName=user.nickname(),
                 mainEmail=user.email(),
                 gamesInProgress=[],
-                gamesCompleted=[],
-                winsTotal=0,
-                gamesTotal=0)
+                gamesCompleted=[])
             player.put()
         return player
 
@@ -152,7 +149,14 @@ class TictactoeApi(remote.Service):
 
     def _isWon(self, game):
         """when the tic-tac-toe game comes to a winning connection"""
-        return game.position1A==game.position2B==game.position3C
+        return (game.position1A==game.position2B==game.position3C!=None or
+            game.position1A==game.position2B==game.position3C!=None or
+            game.position1A==game.position1B==game.position1C!=None or
+            game.position2A==game.position2B==game.position2C!=None or
+            game.position3A==game.position3B==game.position3C!=None or
+            game.position1A==game.position2A==game.position3A!=None or
+            game.position1B==game.position2B==game.position3B!=None or
+            game.position1C==game.position2C==game.position3C!=None)
 
     @endpoints.method(message_types.VoidMessage, PlayerForm,
                       path='player',
@@ -204,7 +208,6 @@ class TictactoeApi(remote.Service):
         # data['gameCancelled'] = False
         data['gameCurrentMove'] = 0
         data['seatsAvailable'] = 2
-        data['moveLogs'] = []
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
@@ -232,26 +235,32 @@ class TictactoeApi(remote.Service):
                 'No game found with key: %s' % request.websafeGameKey)
         # get the authorized user id
         player = self._getProfileFromPlayer()
+        if not player:
+            raise endpoints.NotFoundException('No player found')
         # check if the player has already signed up
-        if game_key.urlsafe() in player.gamesInProgress:
+        else:
+            if game_key.urlsafe() in player.gamesInProgress:
                 raise ConflictException(
                     "You have already registered for this game")
-        # update the specified game
-        user_id = self._getIdFromPlayer()
-        if game.playerOneId is None:
-            game.playerOneId = player.key.urlsafe()
-            player.gamesInProgress.append(game_key.urlsafe())
-            game.seatsAvailable -= 1
+            # update the specified game
+            # user_id = self._getIdFromPlayer()
+            else:
+                if game.playerOneId is None:
+                    setattr(game, 'playerOneId', player.key.urlsafe())
+                    player.gamesInProgress.append(game_key.urlsafe())
+                    # player.gamesTotal += 1
+                    game.seatsAvailable -= 1
 
-        elif game.playerTwoId is None:
-            game.playerTwoId = player.key.urlsafe()
-            player.gamesInProgress.append(game_key.urlsafe())
-            game.seatsAvailable -= 1
+                elif game.playerTwoId is None:
+                    game.playerTwoId = player.key.urlsafe()
+                    player.gamesInProgress.append(game_key.urlsafe())
+                    # player.gamesTotal += 1
+                    game.seatsAvailable -= 1
 
-        else:
-            raise endpoints.UnauthorizedException('Sorry, both spots taken!')
-        game.put()
-        player.put()
+                else:
+                    raise endpoints.UnauthorizedException('Sorry, both spots taken!')
+                game.put()
+                player.put()
 
         return self._copyGameToForm(game)
 
@@ -271,6 +280,9 @@ class TictactoeApi(remote.Service):
         #             games.append(game)
         games = list(g_one)
         games.extend(g for g in g_two if g not in g_one)
+        if not games:
+            raise endpoints.NotFoundException(
+                'Not a single game has this player signed up')
         return GameForms(
             items=[self._copyGameToForm(game) for game in games])
 
@@ -294,21 +306,26 @@ class TictactoeApi(remote.Service):
         elif user_id not in [game.playerOneId, game.playerTwoId]:
             raise endpoints.UnauthorizedException('Only players can cancel \
                 games')
+        elif game.gameOver==True:
+            raise endpoints.UnauthorizedException('Can not cancel finished\
+                games')
         else:
             db.delete(game_key)  # game_key.delete() does not work
         return BooleanMessage(data=cancelled)
 
-    @endpoints.method(message_types.VoidMessage, BooleanMessage,
-                      path='delete_all_games', http_method='DELETE',
-                      name='deleteAllGames')
-    def deleteAllGames(self, request):
-        """
-        deleting all Games created by current player
-        """
-
-        ndb.delete_multi(Game.query().fetch(keys_only=True))
-        deleted = True
-        return BooleanMessage(data=deleted)
+    # @endpoints.method(message_types.VoidMessage, BooleanMessage,
+    #                   path='delete_all_games', http_method='DELETE',
+    #                   name='deleteAllGames')
+    # def deleteAllGames(self, request):
+    #     """
+    #     deleting all Games created by current player, except those that are
+    #     played.
+    #     """
+    #     #keys_only:All operations return keys instead of entities.
+    #     # keys_non_active
+    #     ndb.delete_multi(Game.query().fetch(keys_only=True))
+    #     deleted = True
+    #     return BooleanMessage(data=deleted)
 
     # def getPlayerRankings:
     #     """ each Player's name and the 'performance' indicator (eg. win/loss
@@ -423,33 +440,26 @@ class TictactoeApi(remote.Service):
         data['positionTaken'] = str(request.positionTaken)
         Move(**data).put()
         move = m_key.get()
-        # setattr(move, 'moveNumber', getattr(game, 'gameCurrentMove'))
-        # setattr(move, 'positionTaken', str(request.positionTaken))
-        # if game.gameCurrentMove%2 == 1:
-        #     setattr(move, 'playerNumber', 'One')
-        # elif game.gameCurrentMove%2 == 0:
-        #     setattr(move, 'playerNumber', 'Two')
         logging.debug('move_b')
         logging.debug(move)
         move.put()
         logging.debug('move_af')
         logging.debug(move)
 
-        # Update rest of the Game besides gameCurrentMove
-        # game.moveLogs.append(move)
-        # gameOver = ndb.BooleanProperty()
+        # Update rest of the Game besides gameCurrentMove, as well as player
         player = self._getProfileFromPlayer()
-        setattr(game, str(request.positionTaken), getattr(player, 'displayName'))
-        if self._isWon(game):
-            setattr(game, 'gameOver', True)
-            player.gamesInProgress.remove(g_key.urlsafe())
-            player.gamesCompleted.append(g_key.urlsafe())
-        game.put()
-        player.put()
-
-        # update player
-        # player.gamesInProgress.append(game),gamesCompleted
-        # TODO: if done: update Player and Game
+        if not player:
+            raise endpoints.NotFoundException('no player found')
+        else:
+            setattr(game, str(request.positionTaken), getattr(player,
+                    'displayName'))
+            if self._isWon(game):
+                setattr(game, 'gameOver', True)
+                player.gamesInProgress.remove(g_key.urlsafe())
+                player.gamesCompleted.append(g_key.urlsafe())
+                # setattr(player, 'winsTotal', player.winsTotal+1)
+            game.put()
+            player.put()
 
         return self._copyGameToForm(game)
 
@@ -471,7 +481,9 @@ class TictactoeApi(remote.Service):
             for key in keys:  # to make key from wsks:ndb.Key(urlsafe=wsks)
                 safe_keys.append(ndb.Key(urlsafe=key))
             games = ndb.get_multi(safe_keys)  # to fetch all keys at once
-            if games:
+            if not games:
+                raise endpoints.NotFoundException('No games found')
+            else:
                 return GameForms(
                     items=[self._copyGameToForm(game) for game in games])
 
