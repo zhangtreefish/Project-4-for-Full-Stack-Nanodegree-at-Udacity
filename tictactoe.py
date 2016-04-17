@@ -4,7 +4,6 @@ from google.appengine.api import memcache
 from models import StringMessage
 from models import BooleanMessage
 from google.appengine.ext import db
-
 from google.appengine.api import taskqueue
 from settings import WEB_CLIENT_ID
 import endpoints
@@ -150,6 +149,10 @@ class TictactoeApi(remote.Service):
                 setattr(mf, field.name, getattr(move, field.name))
         mf.check_initialized()
         return mf
+
+    def _isWon(self, game):
+        """when the tic-tac-toe game comes to a winning connection"""
+        return game.position1A==game.position2B==game.position3C
 
     @endpoints.method(message_types.VoidMessage, PlayerForm,
                       path='player',
@@ -307,7 +310,7 @@ class TictactoeApi(remote.Service):
         deleted = True
         return BooleanMessage(data=deleted)
 
-        # def getPlayerRankings:
+    # def getPlayerRankings:
     #     """ each Player's name and the 'performance' indicator (eg. win/loss
     #      ratio)."""
     # def getGameHistory:
@@ -377,12 +380,15 @@ class TictactoeApi(remote.Service):
         game.put()
         return BooleanMessage(data=retval)
 
-    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-                      path='game/{websafeGameKey}',
-                      http_method='POST', name='joinGame')
-    def joinGame(self, request):
-        """Register player for a selected game; can play against self."""
-        return self._gameParticipation(request)
+    # @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
+    #                   path='game/{websafeGameKey}',
+    #                   http_method='POST', name='joinGame')
+    # def joinGame(self, request):
+    #     """
+    #     Register player for a selected game; can play against self-not
+    #     recommended.
+    #     """
+    #     return self._gameParticipation(request)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
                       path='game/{websafeGameKey}',
@@ -434,10 +440,15 @@ class TictactoeApi(remote.Service):
         # gameOver = ndb.BooleanProperty()
         player = self._getProfileFromPlayer()
         setattr(game, str(request.positionTaken), getattr(player, 'displayName'))
+        if self._isWon(game):
+            setattr(game, 'gameOver', True)
+            player.gamesInProgress.remove(g_key.urlsafe())
+            player.gamesCompleted.append(g_key.urlsafe())
         game.put()
+        player.put()
 
         # update player
-        # player.gamesInProgress.append(game)
+        # player.gamesInProgress.append(game),gamesCompleted
         # TODO: if done: update Player and Game
 
         return self._copyGameToForm(game)
