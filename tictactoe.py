@@ -11,8 +11,8 @@ import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
 from models import PlayerForm, PlayerMiniForm, Player, ConflictException
-from models import GameForm, Game, GameForms, Move, MoveForm, ConflictException
-from models import PositionNumber, PlayerNumber
+from models import Game, GameForm, GamesForm, ConflictException
+from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -36,18 +36,22 @@ GAME_MOVE_REQUEST = endpoints.ResourceContainer(
 #     websafeGameKey=messages.StringField(1),
 # )
 MEMCACHE_ANNOUNCEMENTS_KEY = "Recent Announcements"
-DEFAULTS = {
-    "positionOneA": '',
-    "positionOneB": '',
-    "positionOneC": '',
-    "positionTwoA": '',
-    "positionTwoB": '',
-    "positionTwoC": '',
-    "positionThreeA": '',
-    "positionThreeB": '',
-    "positionThreeC": '',
-    "gameCurrentMove": 0,
-    "seatsAvailable": 2
+GAME_DEFAULTS = {
+    # "positionOneA": '',
+    # "positionOneB": '',
+    # "positionOneC": '',
+    # "positionTwoA": '',
+    # "positionTwoB": '',
+    # "positionTwoC": '',
+    # "positionThreeA": '',
+    # "positionThreeB": '',
+    # "positionThreeC": '',
+    # "gameCurrentMove": 0,
+    # "seatsAvailable": 2,
+    # "gameOver": False,
+    # "gameCurrentMove": 0,
+    # "seatsAvailable": 2,
+    "gameWinner": None
 }
 
 
@@ -199,15 +203,11 @@ class TictactoeApi(remote.Service):
         data['key'] = g_key
 
         # add default values for the missing(data model & outbound Message)
-        # for df in DEFAULTS:
+        # for df in GAME_DEFAULTS:
         #     if data[df] is None:
         #         data[df] = DEFAULTS[df]
         #         setattr(request, df, DEFAULTS[df])
 
-        data['gameOver'] = False
-        # data['gameCancelled'] = False
-        data['gameCurrentMove'] = 0
-        data['seatsAvailable'] = 2
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
@@ -264,7 +264,7 @@ class TictactoeApi(remote.Service):
 
         return self._copyGameToForm(game)
 
-    @endpoints.method(message_types.VoidMessage, GameForms,
+    @endpoints.method(message_types.VoidMessage, GamesForm,
                       path='games', http_method='GET', name='getPlayerGames')
     def getPlayerGames(self, request):
         """
@@ -283,8 +283,19 @@ class TictactoeApi(remote.Service):
         if not games:
             raise endpoints.NotFoundException(
                 'Not a single game has this player signed up')
-        return GameForms(
+        return GamesForm(
             items=[self._copyGameToForm(game) for game in games])
+
+    @endpoints.method(message_types.VoidMessage, GamesForm,
+                      path='all_games', http_method='GET', name='allGames')
+    def allGames(self, request):
+        """
+        This returns all games ever created by anyone on this app.
+        """
+        games = Game.query().fetch()
+        return GamesForm(
+            items=[self._copyGameToForm(game) for game in games])
+
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
                       path='delete_game/{websafeGameKey}',
@@ -327,11 +338,6 @@ class TictactoeApi(remote.Service):
     #     deleted = True
     #     return BooleanMessage(data=deleted)
 
-    # def getPlayerRankings:
-    #     """ each Player's name and the 'performance' indicator (eg. win/loss
-    #      ratio)."""
-    # def getGameHistory:
-    #     """ a 'history' of the moves for each game"""
 # - - - Conference objects - - - - - - - - - - - - - - - - -
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
@@ -420,8 +426,8 @@ class TictactoeApi(remote.Service):
                       name='makeMove')
     def makeMove(self, request):
         """
-        authorized player makes a move: create a move, update Game, and if
-        completed update Player
+        authenticated player makes a move, implemented by creating a move,
+         updating Game and Player
         """
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
         # create a move
@@ -431,12 +437,36 @@ class TictactoeApi(remote.Service):
         data = {}
         data['key'] = m_key
         game = g_key.get()
+        if game.playerOneId is None or game.playerTwoId is None:
+            raise endpoints.UnauthorizedException('Need 2 players to start')
+        # get player
+        player = self._getProfileFromPlayer()
+        if not player:
+            raise endpoints.NotFoundException('no player found')
+
+        # get last move to check if the player had played the last move
+        last_move = Move.query(Move.moveNumber==game.gameCurrentMove).get()
+
         game.gameCurrentMove += 1
         data['moveNumber'] = game.gameCurrentMove
         if game.gameCurrentMove%2 == 1:
-            data['playerNumber'] = 'One'
+            num = 'One'
+            if last_move is None:
+                data['playerNumber'] = player.key.urlsafe()
+            elif last_move.playerNumber==player.key.urlsafe():
+                raise endpoints.UnauthorizedException(
+                    "Player %s, it is your opponent's turn") %num
+            else:
+                data['playerNumber'] = player.key.urlsafe()
         elif game.gameCurrentMove%2 == 0:
-            data['playerNumber'] = 'Two'
+            num = 'Two'
+            if last_move is None:
+                data['playerNumber'] = player.key.urlsafe()
+            if last_move.playerNumber==player.key.urlsafe():
+                raise endpoints.UnauthorizedException(
+                    'Player %s, wait for your turn') %num
+            else:
+                data['playerNumber'] = player.key.urlsafe()
         data['positionTaken'] = str(request.positionTaken)
         Move(**data).put()
         move = m_key.get()
@@ -445,8 +475,9 @@ class TictactoeApi(remote.Service):
         move.put()
         logging.debug('move_af')
         logging.debug(move)
+        print 'move:', move
 
-        # Update rest of the Game besides gameCurrentMove, as well as player
+        # Update Game on the position affected by the move, as well as player
         player = self._getProfileFromPlayer()
         if not player:
             raise endpoints.NotFoundException('no player found')
@@ -463,7 +494,7 @@ class TictactoeApi(remote.Service):
 
         return self._copyGameToForm(game)
 
-    @endpoints.method(message_types.VoidMessage, GameForms,
+    @endpoints.method(message_types.VoidMessage, GamesForm,
                       path='games_active',
                       http_method='GET', name='getActiveGames')
     def getActiveGames(self, request):
@@ -486,6 +517,16 @@ class TictactoeApi(remote.Service):
             else:
                 return GameForms(
                     items=[self._copyGameToForm(game) for game in games])
+
+    # def getPlayerRankings:
+    #     """ each Player's name and the 'performance' indicator (eg. win/loss
+    #      ratio)."""
+    @endpoints.method(GAME_GET_REQUEST, MovesForm,
+                      path='game_history/{websafeGameKey}',
+                      http_method='GET', name='gameHistory')
+    def getGameHistory(self, request):
+        """ a 'history' of the moves for each game"""
+        game
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod

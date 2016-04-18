@@ -53,7 +53,7 @@ class Move(ndb.Model):
 
 class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
-    seatsAvailable = ndb.IntegerProperty()
+    seatsAvailable = ndb.IntegerProperty(default=2)
     playerOneId = ndb.StringProperty()
     playerTwoId = ndb.StringProperty()
     position1A = ndb.StringProperty()
@@ -66,10 +66,12 @@ class Game(ndb.Model):
     position3B = ndb.StringProperty()
     position3C = ndb.StringProperty()
     # moveLogs = ndb.StructuredProperty(Move, repeated=True)
-    gameCurrentMove = ndb.IntegerProperty()
+    gameCurrentMove = ndb.IntegerProperty(default=0)
     # playerCurrentTurn = ndb.StringProperty()
-    gameOver = ndb.BooleanProperty()
+    gameOver = ndb.BooleanProperty(default=False)
+    gameWinner = ndb.StringProperty()
     # gameCancelled = ndb.BooleanProperty()
+    # TODO: winner here, or the player of the last move of completed games
 
 
 class MoveForm(messages.Message):
@@ -78,6 +80,10 @@ class MoveForm(messages.Message):
     playerNumber = messages.EnumField(PlayerNumber, 2)
     positionTaken = messages.EnumField(PositionNumber, 3)
 
+
+class MovesForm(messages.Message):
+    """outbound message as response object of a game history query"""
+    items = messages.MessageField(MoveForm, 1, repeated=True)
 
 class PlayerMiniForm(messages.Message):
     """ as inbound request message"""
@@ -117,7 +123,7 @@ class GameForm(messages.Message):
     # moveLogs = messages.MessageField(MoveForm, 16, repeated=True)
 
 
-class GameForms(messages.Message):
+class GamesForm(messages.Message):
     """ multiple game outbound form message as response object"""
     items = messages.MessageField(GameForm, 1, repeated=True)
 
