@@ -1,0 +1,27 @@
+I am not certain how to implement a two-player game such as tic tac toe: would
+I let one player create a game and issue an announcement somewhere, and then
+get the second player to pick among a list of games that are needing a second
+player? If so, the Game kind would have a Boolean property called "need a
+second player", and there needs to be an endpoint called 'pick a game waiting
+for another player', and a form that is a list of such waiting games.
+
+To expand the 2-person-game to multiple-person game scenario, it will be better
+have a property called 'seatsAvailable' just like in a conference app which
+gets decremented each time a player signs up. So I used that.
+
+Game entities are created with player as the parent. Creating a game is
+different from signing up for a game in my tic-tac-toe game api.  When a player
+signs up for a game, the game key gets stored in the player's gamesInProgress
+property. The trouble is that when a game gets deleted, it still can be in
+the gamesInProgress list, if the programmer(here me) forgets to update it. Is
+there an automatically linked way of storing this gamesInProgress property? Do
+not know.
+TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
+For tic-tac-toe which is a two-player game, I have to implement a turn
+mechanism. Initially I resorted to checking the player of the last move, it
+somehow did not work; it was probably because the check was needed to determine
+if a Move should be created; but the assess the check the last move had to be
+retrieved. That could have created a circular logic, in that before the Move
+is to be created, that is no 'last Move' to speak of. So I switched from
+checking Move to checking 'lastPlayer' property of Game, with success in the
+end.
