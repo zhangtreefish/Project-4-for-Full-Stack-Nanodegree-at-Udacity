@@ -137,8 +137,6 @@ class TictactoeApi(remote.Service):
                 setattr(gf, field.name, getattr(game, field.name))
             elif field.name == "websafeKey":
                 setattr(gf, field.name, game.key.urlsafe())
-        # if displayName:
-        #     setattr(gf, 'playerOneName', displayName)
         gf.check_initialized()
         return gf
 
@@ -203,13 +201,6 @@ class TictactoeApi(remote.Service):
         g_key = ndb.Key(Game, g_id, parent=p_key)
         data = {}  # is a dict
         data['key'] = g_key
-
-        # add default values for the missing(data model & outbound Message)
-        # for df in GAME_DEFAULTS:
-        #     if data[df] is None:
-        #         data[df] = DEFAULTS[df]
-        #         setattr(request, df, DEFAULTS[df])
-
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
@@ -245,7 +236,6 @@ class TictactoeApi(remote.Service):
                 raise ConflictException(
                     "You have already registered for this game")
             # update the specified game
-            # user_id = self._getIdFromPlayer()
             else:
                 if game.playerOneId is None:
                     setattr(game, 'playerOneId', player.key.urlsafe())
@@ -274,14 +264,13 @@ class TictactoeApi(remote.Service):
         or as playerTwo.
         """
         player = self._getProfileFromPlayer()
+        # get games as either as playerOne or playerTwo
         g_one = Game.query(Game.playerOneId == player.key.urlsafe()).fetch()
         g_two = Game.query(Game.playerTwoId == player.key.urlsafe()).fetch()
-        # if player_two_games:
-        #     for game in player_two_games:
-        #         if game not in games:
-        #             games.append(game)
+        # combine the two lists
         games = list(g_one)
         games.extend(g for g in g_two if g not in g_one)
+        # check and return games form
         if not games:
             raise endpoints.NotFoundException(
                 'Not a single game has this player signed up')
@@ -339,8 +328,6 @@ class TictactoeApi(remote.Service):
     #     ndb.delete_multi(Game.query().fetch(keys_only=True))
     #     deleted = True
     #     return BooleanMessage(data=deleted)
-
-# - - - Conference objects - - - - - - - - - - - - - - - - -
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='game/{websafeGameKey}',
@@ -537,7 +524,7 @@ class TictactoeApi(remote.Service):
                 ', '.join(game.name for game in games))
             memcache.set(MEMCACHE_ANNOUNCEMENTS_KEY, announcement)
         else:
-            # If there are no sold out conferences,
+            # If there are no available games,
             # delete the memcache announcements entry
             announcement = ""
             memcache.delete(MEMCACHE_ANNOUNCEMENTS_KEY)
@@ -549,9 +536,6 @@ class TictactoeApi(remote.Service):
                       http_method='GET', name='getAnnouncement')
     def getAnnouncement(self, request):
         """Return Announcement from memcache."""
-        # TODO 1
-        # return an existing announcement from Memcache or an empty string.
-        # announcement = self._cacheAnnouncement()
         self._cacheAnnouncement()
         announcement = memcache.get(MEMCACHE_ANNOUNCEMENTS_KEY)
         if not announcement:
