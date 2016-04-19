@@ -418,15 +418,13 @@ class TictactoeApi(remote.Service):
         authenticated player makes a move, implemented by creating a move,
          updating Game and Player
         """
-        print '!!', request.websafeGameKey
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
-        # print 'g_key', g_key
         game = g_key.get()
+        # for some keys the following catches a bad key error:
         # game = get_by_urlsafe(request.websafeGameKey, Game)
-
-        # # create a move
         # g_key = game.key
-        print 'g_key', g_key
+
+        # create a move
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
         print 'm_key', m_key.urlsafe()
@@ -502,8 +500,15 @@ class TictactoeApi(remote.Service):
                       path='game_history/{websafeGameKey}',
                       http_method='GET', name='gameHistory')
     def getGameHistory(self, request):
-        """ a 'history' of the moves for each game"""
-        game
+        """ shows a list of all the moves for each game"""
+        game = get_by_urlsafe(request.websafeGameKey, Game)
+        game_key = game.key
+        moves = Move.query(ancestor=game_key).fetch()
+        if not moves:
+            raise endpoints.NotFoundException('No moves found')
+        else:
+            return MovesForm(items=[self._copyMoveToForm(move) for move in moves])
+
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod

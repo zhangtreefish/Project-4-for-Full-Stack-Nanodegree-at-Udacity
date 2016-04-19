@@ -77,8 +77,8 @@ class Game(ndb.Model):
 class MoveForm(messages.Message):
     """outbound form message as response object after making a move"""
     moveNumber = messages.IntegerField(1)
-    playerNumber = messages.EnumField(PlayerNumber, 2)
-    positionTaken = messages.EnumField(PositionNumber, 3)
+    playerNumber = messages.StringField(2)
+    positionTaken = messages.StringField(3)
 
 
 class MovesForm(messages.Message):
