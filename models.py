@@ -67,7 +67,7 @@ class Game(ndb.Model):
     position3C = ndb.StringProperty()
     # moveLogs = ndb.StructuredProperty(Move, repeated=True)
     gameCurrentMove = ndb.IntegerProperty(default=0)
-    # playerCurrentTurn = ndb.StringProperty()
+    lastPlayer = ndb.StringProperty()
     gameOver = ndb.BooleanProperty(default=False)
     gameWinner = ndb.StringProperty()
     # gameCancelled = ndb.BooleanProperty()

@@ -14,6 +14,8 @@ from models import PlayerForm, PlayerMiniForm, Player, ConflictException
 from models import Game, GameForm, GamesForm, ConflictException
 from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
+import base64
+from utils import get_by_urlsafe
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -429,63 +431,51 @@ class TictactoeApi(remote.Service):
         authenticated player makes a move, implemented by creating a move,
          updating Game and Player
         """
+        print '!!', request.websafeGameKey
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
-        # create a move
+        # print 'g_key', g_key
+        game = g_key.get()
+        # game = get_by_urlsafe(request.websafeGameKey, Game)
+
+        # # create a move
+        # g_key = game.key
+        print 'g_key', g_key
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
         print 'm_key', m_key.urlsafe()
-        data = {}
-        data['key'] = m_key
-        game = g_key.get()
+
+        player = self._getProfileFromPlayer()
+        if not player:
+            raise endpoints.NotFoundException('no player found')
+        # check if game is signed up by two players and by the current player
         if game.playerOneId is None or game.playerTwoId is None:
             raise endpoints.UnauthorizedException('Need 2 players to start')
-        # get player
-        player = self._getProfileFromPlayer()
-        if not player:
-            raise endpoints.NotFoundException('no player found')
+        if player.key.urlsafe() not in [game.playerTwoId, game.playerOneId]:
+            raise endpoints.UnauthorizedException('You did not sign up')
 
-        # get last move to check if the player had played the last move
-        last_move = Move.query(Move.moveNumber==game.gameCurrentMove).get()
-
-        game.gameCurrentMove += 1
-        data['moveNumber'] = game.gameCurrentMove
-        if game.gameCurrentMove%2 == 1:
-            num = 'One'
-            if last_move is None:
-                data['playerNumber'] = player.key.urlsafe()
-            elif last_move.playerNumber==player.key.urlsafe():
-                raise endpoints.UnauthorizedException(
-                    "Player %s, it is your opponent's turn") %num
-            else:
-                data['playerNumber'] = player.key.urlsafe()
-        elif game.gameCurrentMove%2 == 0:
-            num = 'Two'
-            if last_move is None:
-                data['playerNumber'] = player.key.urlsafe()
-            if last_move.playerNumber==player.key.urlsafe():
-                raise endpoints.UnauthorizedException(
-                    'Player %s, wait for your turn') %num
-            else:
-                data['playerNumber'] = player.key.urlsafe()
-        data['positionTaken'] = str(request.positionTaken)
-        Move(**data).put()
-        move = m_key.get()
-        logging.debug('move_b')
-        logging.debug(move)
-        move.put()
-        logging.debug('move_af')
-        logging.debug(move)
-        print 'move:', move
-
-        # Update Game on the position affected by the move, as well as player
-        player = self._getProfileFromPlayer()
-        if not player:
-            raise endpoints.NotFoundException('no player found')
+        # check if the player had played the last move
+        elif player.displayName==game.lastPlayer!= None:
+            raise endpoints.UnauthorizedException(
+                "Player, it is your opponent's turn")
         else:
+            data = {}
+            data['key'] = m_key
+            data['moveNumber'] = game.gameCurrentMove + 1
+            data['playerNumber'] = player.key.urlsafe()
+            data['positionTaken'] = str(request.positionTaken)
+            Move(**data).put()
+            move = m_key.get()
+
+            # Update Game on the position affected by the move, as well as player
+            game.gameCurrentMove += 1
             setattr(game, str(request.positionTaken), getattr(player,
+                    'displayName'))
+            setattr(game, 'lastPlayer', getattr(player,
                     'displayName'))
             if self._isWon(game):
                 setattr(game, 'gameOver', True)
+                setattr(game, 'gameWinner', getattr(player,
+                    'displayName'))
                 player.gamesInProgress.remove(g_key.urlsafe())
                 player.gamesCompleted.append(g_key.urlsafe())
                 # setattr(player, 'winsTotal', player.winsTotal+1)
