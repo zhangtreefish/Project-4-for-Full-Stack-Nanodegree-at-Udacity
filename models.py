@@ -53,6 +53,7 @@ class Move(ndb.Model):
 
 class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
+    name = ndb.StringProperty()
     seatsAvailable = ndb.IntegerProperty(default=2)
     playerOneId = ndb.StringProperty()
     playerTwoId = ndb.StringProperty()
@@ -131,6 +132,7 @@ class GameForm(messages.Message):
     gameOver = messages.BooleanField(13)
     gameCurrentMove = messages.IntegerField(14)
     websafeKey = messages.StringField(15)
+    name = messages.StringField(16)
     # playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
     # moveLogs = messages.MessageField(MoveForm, 16, repeated=True)
 

@@ -25,6 +25,10 @@ API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 #     message_types.VoidMessage,
 #     user_name=messages.StringField(1),
 #     email=messages.StringField(2))
+GAME_CREATE_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    name=messages.StringField(1),
+)
 GAME_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
@@ -208,7 +212,7 @@ class TictactoeApi(remote.Service):
         logging.info('saving your profile')
         return self._doProfile(request)
 
-    @endpoints.method(message_types.VoidMessage, GameForm,
+    @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
                       http_method='POST',
                       name='createGame')
@@ -230,6 +234,7 @@ class TictactoeApi(remote.Service):
         g_key = ndb.Key(Game, g_id, parent=p_key)
         data = {}  # is a dict
         data['key'] = g_key
+        data['name'] = request.name
         Game(**data).put()
 
         taskqueue.add(params={'email': user.email(),
