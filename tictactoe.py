@@ -448,7 +448,9 @@ class TictactoeApi(remote.Service):
         # for some keys the following catches a bad key error:
         # game = get_by_urlsafe(request.websafeGameKey, Game)
         # g_key = game.key
-
+        # check if the game is already completed
+        if game.gameWinner:
+            raise endpoints.UnauthorizedException('This game is already won.')
         # create a move
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
