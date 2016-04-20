@@ -71,7 +71,6 @@ class Game(ndb.Model):
     gameOver = ndb.BooleanProperty(default=False)
     gameWinner = ndb.StringProperty()
     # gameCancelled = ndb.BooleanProperty()
-    # TODO: winner here, or the player of the last move of completed games
 
 
 class MoveForm(messages.Message):
@@ -99,6 +98,19 @@ class PlayerForm(messages.Message):
     gamesCompleted = messages.StringField(5, repeated=True)
     # winsTotal = messages.IntegerField(6)
     # gamesTotal = messages.IntegerField(7)
+
+
+class PlayerRankForm(messages.Message):
+    """as outbound response message pertaining players' ranking"""
+    displayName = messages.StringField(1)
+    winsTotal = messages.IntegerField(2)
+    gamesTotal = messages.IntegerField(3)
+    percentage = messages.StringField(4)
+
+
+class PlayersRankForm(messages.Message):
+    """as outbound response message pertaining players' ranking"""
+    items = messages.MessageField(PlayerRankForm, 1, repeated=True)
 
 
 class GameForm(messages.Message):

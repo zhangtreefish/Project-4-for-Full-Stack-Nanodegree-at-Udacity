@@ -75,15 +75,19 @@ class TictactoeApi(remote.Service):
         setattr(prf, 'displayName', getattr(player, 'displayName'))
         gamesWon = set()
         for g in player.gamesCompleted:
-            game = ndb.Key(urlsafe=g).get()
+            game = get_by_urlsafe(g, Game)
+
             print 'g', g
-            if game.gameWinner==player.displayName:
+            if game and game.gameWinner==player.displayName:
                 gamesWon.add(g)
 
         # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
         winsTotal = len(gamesWon)
         gamesTotal = len(player.gamesCompleted)
-        percentage = winsTotal/gamesTotal
+        percentage = None
+        if gamesTotal!=0:
+            percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
+            print 'percentage', percentage
         setattr(prf, 'winsTotal', winsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)
         setattr(prf, 'percentage', percentage)
@@ -533,7 +537,7 @@ class TictactoeApi(remote.Service):
         a list consisting of each Player's name and the winning percentage
         """
         players = Player.query().fetch()
-        return GamesForm(
+        return PlayersRankForm(
             items=[self._copyPlayerToRankForm(p) for p in players])
 
 
