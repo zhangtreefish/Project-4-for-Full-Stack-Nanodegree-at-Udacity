@@ -500,7 +500,10 @@ class TictactoeApi(remote.Service):
                       path='games_active',
                       http_method='GET', name='getActiveGames')
     def getActiveGames(self, request):
-        """Get a list of games that the player has made moves in."""
+        """
+        Get a list of games that the player has made moves in AND that have
+        not ended.
+        """
         # get user profile
         player = self._getProfileFromPlayer()
         # get gamesInProgress from profile.
@@ -520,7 +523,8 @@ class TictactoeApi(remote.Service):
                 raise endpoints.NotFoundException('No games found')
             else:
                 return GamesForm(
-                    items=[self._copyGameToForm(game) for game in games if game])
+                    items=[self._copyGameToForm(game) for game in games if game
+                    and game.gameOver is False])
 
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
         path='players_ranking', http_method='GET', name='playersRanking')
