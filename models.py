@@ -149,7 +149,7 @@ class GameQueryForm(messages.Message):
     value = messages.StringField(3)
 
 
-class GameQueryForms(messages.Message):
+class GamesQueryForm(messages.Message):
     """ as request object-- multiple GameQueryForm inbound form message"""
     filters = messages.MessageField(GameQueryForm, 1, repeated=True)
 
