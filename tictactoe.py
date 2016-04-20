@@ -12,6 +12,7 @@ from additions.utils import getUserId
 from protorpc import messages, message_types, remote
 from models import PlayerForm, PlayerMiniForm, Player, ConflictException
 from models import Game, GameForm, GamesForm, ConflictException
+from models import PlayerRankForm, PlayersRankForm
 from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
 import base64
@@ -66,6 +67,29 @@ class TictactoeApi(remote.Service):
 
 # - - - Player objects - - - - - - - - - - - - - - - - - - -
 
+    def _copyPlayerToRankForm(self, player):
+        """Copy relevant fields from player to PlayerRankForm."""
+        prf = PlayerRankForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        setattr(prf, 'displayName', getattr(player, 'displayName'))
+        gamesWon = set()
+        for g in player.gamesCompleted:
+            game = ndb.Key(urlsafe=g).get()
+            print 'g', g
+            if game.gameWinner==player.displayName:
+                gamesWon.add(g)
+
+        # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
+        winsTotal = len(gamesWon)
+        gamesTotal = len(player.gamesCompleted)
+        percentage = winsTotal/gamesTotal
+        setattr(prf, 'winsTotal', winsTotal)
+        setattr(prf, 'gamesTotal', gamesTotal)
+        setattr(prf, 'percentage', percentage)
+        prf.check_initialized()
+        return prf
+
     def _copyPlayerToForm(self, player):
         """Copy relevant fields from player to PlayerForm."""
         pf = PlayerForm()
@@ -76,6 +100,7 @@ class TictactoeApi(remote.Service):
                 setattr(pf, field.name, getattr(player, field.name))
         pf.check_initialized()
         return pf
+
 
     def _getProfileFromPlayer(self):
         """
@@ -479,6 +504,7 @@ class TictactoeApi(remote.Service):
         # get gamesInProgress from profile.
         keys = getattr(player, 'gamesInProgress')
         logging.debug('keys')
+        print 'keys', keys
         if keys is None:
             raise endpoints.NotFoundException(
                 'You have 0 gamesInProgress')
@@ -487,15 +513,24 @@ class TictactoeApi(remote.Service):
             for key in keys:  # to make key from wsks:ndb.Key(urlsafe=wsks)
                 safe_keys.append(ndb.Key(urlsafe=key))
             games = ndb.get_multi(safe_keys)  # to fetch all keys at once
+            print 'games', games
             if not games:
                 raise endpoints.NotFoundException('No games found')
             else:
-                return GameForms(
-                    items=[self._copyGameToForm(game) for game in games])
+                return GamesForm(
+                    items=[self._copyGameToForm(game) for game in games if game])
 
-    # def getPlayerRankings:
-    #     """ each Player's name and the 'performance' indicator (eg. win/loss
-    #      ratio)."""
+    @endpoints.method(message_types.VoidMessage, PlayersRankForm,
+        path='players_ranking', http_method='GET', name='playersRanking')
+    def getPlayerRankings(self, request):
+        """
+        a list consisting of each Player's name and the winning percentage
+        """
+        players = Player.query().fetch()
+        return GamesForm(
+            items=[self._copyPlayerToRankForm(p) for p in players])
+
+
     @endpoints.method(GAME_GET_REQUEST, MovesForm,
                       path='game_history/{websafeGameKey}',
                       http_method='GET', name='gameHistory')
