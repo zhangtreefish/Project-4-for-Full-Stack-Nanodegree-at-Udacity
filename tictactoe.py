@@ -254,7 +254,7 @@ class TictactoeApi(remote.Service):
         game = game_key.get()
         if not game:
             raise endpoints.NotFoundException(
-                'No game found with key: %s' % request.websafeGameKey)
+                'No game found with key: {}' .format(request.websafeGameKey))
         # get the authorized user id
         player = self._getProfileFromPlayer()
         if not player:
