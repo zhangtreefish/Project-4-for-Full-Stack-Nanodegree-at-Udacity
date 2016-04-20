@@ -27,15 +27,15 @@ class SetAnnouncementHandler(webapp2.RequestHandler):
 
 class SendConfirmationEmailHandler(webapp2.RequestHandler):
     def post(self):
-        """Send email confirming Conference creation."""
+        """Send email confirming Game creation."""
         mail.send_mail(
-            'noreply@%s.appspotmail.com' % (
+            'noreply@{}.appspotmail.com' .format(
                 app_identity.get_application_id()),     # from
             self.request.get('email'),                  # to
             'You created a new tictactoe game!',        # subj
             'Hi, you have created a following '         # body
-            'game:\r\n\r\n%s' % self.request.get(
-                'gameInfo')
+            'game:\r\n\r\n{}' .format(self.request.get(
+                'gameInfo'))
         )
 
 app = webapp2.WSGIApplication([

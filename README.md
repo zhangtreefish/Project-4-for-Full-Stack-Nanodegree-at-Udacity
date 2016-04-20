@@ -15,8 +15,8 @@
    created
 3. Sign up for a game by 'participateGame', need to enter the 'websafeGameKey'
    of the intended game;
-4. Play by 'MakeMove': need to enter the 'websafeGameKey';use 'getPlayerGames'
-   or 'allGames' to find a game key
+4. Play by 'MakeMove': need to enter the 'websafeGameKey';use 'getPlayerGames',
+   'queryGames', or 'allGames' to find a game key
 
 # Reference:
 1. http://pep8online.com/

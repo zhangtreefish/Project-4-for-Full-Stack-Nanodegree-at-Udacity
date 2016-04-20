@@ -18,9 +18,9 @@ Game entities are created with player as the parent. Creating a game is
 different from signing up for a game in my tic-tac-toe game API.  When a player
 signs up for a game, the game key gets stored in the player's gamesInProgress
 property. The trouble is that when a game gets deleted by a player, it still
-can be in the gamesInProgress list of kind Player, if the programmer(here me)
+can be in the gamesInProgress list of a Player, if the programmer(here me)
 forgets to update the Player. Is there an automatically linked way of storing
-this gamesInProgress property of Player so it is real-time with Game? I can
+this gamesInProgress property of Player so it is in sync with Game? I can
 not think of any. Perhaps then the least confusing way is not to have this
 property alltogether? For the time being I keep this property to facilitate the
 calculation of ranking.
@@ -35,8 +35,8 @@ switched from checking Move to checking the 'lastPlayer' property of Game,
 with success in the end.
 
 The makeMove method also brings up another question about transaction. A
-wrapper like '@ndb.transactional(xg=True)' should be required for makeMove
- method since makeMove involves updating all of Move, Game, and Player kinds.
+decorator like '@ndb.transactional(xg=True)' should be required for makeMove
+ method since makeMove involves updating all of Move, Game, and Player entities.
 Adding '@ndb.transactional(xg=True)' just above 'def makeMove' broke the
 method with 'AttributeError: 'TransactionalConnection' object has no attribute
 'async_allocate_ids'
