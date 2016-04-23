@@ -142,18 +142,6 @@ class GamesForm(messages.Message):
     items = messages.MessageField(GameForm, 1, repeated=True)
 
 
-class GameQueryForm(messages.Message):
-    """ as request object-- query inbound form message"""
-    field = messages.StringField(1)
-    operator = messages.StringField(2)
-    value = messages.StringField(3)
-
-
-class GamesQueryForm(messages.Message):
-    """ as request object-- multiple GameQueryForm inbound form message"""
-    filters = messages.MessageField(GameQueryForm, 1, repeated=True)
-
-
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)

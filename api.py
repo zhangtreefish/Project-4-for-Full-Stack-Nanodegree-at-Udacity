@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from google.appengine.api import memcache
 from models import StringMessage
 from models import BooleanMessage
@@ -12,7 +10,7 @@ from additions.utils import getUserId
 from protorpc import messages, message_types, remote
 from models import PlayerForm, PlayerMiniForm, Player, ConflictException
 from models import Game, GameForm, GamesForm, ConflictException
-from models import PlayerRankForm, PlayersRankForm, GamesQueryForm
+from models import PlayerRankForm, PlayersRankForm
 from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
 import base64
@@ -27,7 +25,7 @@ API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 #     email=messages.StringField(2))
 GAME_CREATE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
-    name=messages.StringField(1),
+    name=messages.StringField(1),  # give the game a name
 )
 GAME_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
@@ -38,42 +36,14 @@ GAME_MOVE_REQUEST = endpoints.ResourceContainer(
     websafeGameKey=messages.StringField(1),
     positionTaken=messages.EnumField(PositionNumber, 2)
 )
-# GAME_GET_REQUEST = endpoints.ResourceContainer(
-#     message_types.VoidMessage,
-#     websafeGameKey=messages.StringField(1),
-# )
+
 MEMCACHE_ANNOUNCEMENTS_KEY = "Recent Announcements"
 DEFAULTS = {
-    # "positionOneA": '',
-    # "positionOneB": '',
-    # "positionOneC": '',
-    # "positionTwoA": '',
-    # "positionTwoB": '',
-    # "positionTwoC": '',
-    # "positionThreeA": '',
-    # "positionThreeB": '',
-    # "positionThreeC": '',
     "seatsAvailable": 2,
     "gameOver": False,
     "gameCurrentMove": 0,
     "name":''
 }
-# use the keys of the OPERATORS as the valid operator to query games
-OPERATORS = {
-            'EQ':   '=',
-            'GT':   '>',
-            'GTEQ': '>=',
-            'LT':   '<',
-            'LTEQ': '<=',
-            'NE':   '!='
-            }
-# use the keys of the FIELDS as the valid field to query games
-FIELDS =    {
-            'GameCurrentMove': 'gameCurrentMove',
-            'SeatsAvailable': 'seatsAvailable',
-            'GameOver': 'gameOver',
-            'Name': 'name'
-            }
 
 @endpoints.api(name='tictactoe',
                version='v1',
@@ -146,16 +116,6 @@ class TictactoeApi(remote.Service):
             player.put()
         return player
 
-    def _getIdFromPlayer(self):
-        """
-        Return player Id from datastore, creating new one if non-existent.
-        """
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
-        return user_id
-
     def _doProfile(self, edit_request=None):
         """
         Get player Profile and return to player, possibly updating it first.
@@ -208,57 +168,6 @@ class TictactoeApi(remote.Service):
             game.position1B==game.position2B==game.position3B!=None or
             game.position1C==game.position2C==game.position3C!=None)
 
-    def _getQuery(self, request):
-        """Return formatted query from the submitted filters."""
-        gs = Game.query()
-        inequality_filter, filters = self._formatFilters(request.filters)
-
-        # If exists, sort on inequality filter first
-        if not inequality_filter:
-            gs = gs.order(Game.name)
-        else:
-            gs = gs.order(ndb.GenericProperty(inequality_filter))
-            gs = gs.order(Game.name)
-
-        for filtr in filters:
-            if filtr["field"] in ["seatsAvailable", "gameCurrentMove"]:
-                filtr["value"] = int(filtr["value"])
-            formatted_query = ndb.query.FilterNode(filtr["field"], filtr["operator"], filtr["value"])
-            gs = gs.filter(formatted_query)
-        return gs
-
-
-    def _formatFilters(self, filters):
-        """Parse, check validity and format user-supplied filters."""
-        formatted_filters = []
-        inequality_field = None
-
-        for f in filters:
-            print 'f.all_fields()', f.all_fields()
-            logging.debug('f.all_fields()')
-            logging.debug(f.all_fields())
-            filtr = {field.name: getattr(f, field.name) for field in f.all_fields()}
-
-            try:
-                filtr["field"] = FIELDS[filtr["field"]]
-                filtr["operator"] = OPERATORS[filtr["operator"]]
-            except KeyError:
-                raise endpoints.BadRequestException("Filter contains invalid field or operator.")
-
-            # Every operation except "=" is an inequality
-            if filtr["operator"] != "=":
-                # check if inequality operation has been used in previous filters
-                # disallow the filter if inequality was performed on a different field before
-                # track the field on which the inequality operation is performed
-                if inequality_field and inequality_field != filtr["field"]:
-                    raise endpoints.BadRequestException("Inequality filter is allowed on only one field.")
-                else:
-                    inequality_field = filtr["field"]
-
-            formatted_filters.append(filtr)
-        return (inequality_field, formatted_filters)
-
-
     @endpoints.method(message_types.VoidMessage, PlayerForm,
                       path='player',
                       http_method='GET',
@@ -266,15 +175,6 @@ class TictactoeApi(remote.Service):
     def getPlayer(self, request):
         """Return current player profile."""
         return self._doProfile(True)
-
-    @endpoints.method(PlayerMiniForm, PlayerForm,
-                      path='edit_player',
-                      http_method='POST',
-                      name='editPlayer')
-    def editPlayer(self, request):
-        """Update displayName & profile of the current player"""
-        logging.info('saving your profile')
-        return self._doProfile(request)
 
     @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
@@ -308,19 +208,6 @@ class TictactoeApi(remote.Service):
         print 'game', game
         gf = self._copyGameToForm(game)
         return gf
-
-    @endpoints.method(GamesQueryForm, GamesForm,
-                      path='queryGames',
-                      http_method='POST',
-                      name='queryGames')
-    def queryGames(self,request):
-        """Query for games."""
-        games = self._getQuery(request)
-
-         # return individual GameForm object per game
-        return GamesForm(
-            items=[self._copyGameToForm(g) for g in games]
-        )
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='participate_game/{websafeGameKey}',
@@ -366,79 +253,6 @@ class TictactoeApi(remote.Service):
                 player.put()
 
         return self._copyGameToForm(game)
-
-    @endpoints.method(message_types.VoidMessage, GamesForm,
-                      path='games', http_method='GET', name='getPlayerGames')
-    def getPlayerGames(self, request):
-        """
-        This returns all games a player has signed up for, either as playerOne
-        or as playerTwo.
-        """
-        player = self._getProfileFromPlayer()
-        # get games as either as playerOne or playerTwo
-        g_one = Game.query(Game.playerOneId == player.key.urlsafe()).fetch()
-        g_two = Game.query(Game.playerTwoId == player.key.urlsafe()).fetch()
-        # combine the two lists
-        games = list(g_one)
-        games.extend(g for g in g_two if g not in g_one)
-        # check and return games form
-        if not games:
-            raise endpoints.NotFoundException(
-                'Not a single game has this player signed up')
-        return GamesForm(
-            items=[self._copyGameToForm(game) for game in games])
-
-    @endpoints.method(message_types.VoidMessage, GamesForm,
-                      path='all_games', http_method='GET', name='allGames')
-    def allGames(self, request):
-        """
-        This returns all games ever created by anyone on this app.
-        """
-        games = Game.query().fetch()
-        return GamesForm(
-            items=[self._copyGameToForm(game) for game in games])
-
-
-    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-                      path='delete_game/{websafeGameKey}',
-                      http_method='DELETE',
-                      name='deleteGame')
-    def deleteGame(self, request):
-        """
-        allows either player to cancel a game in progress, implemented by
-        deleting the Game model itself
-        """
-        # get the game
-        game_key = request.websafeGameKey
-        game = ndb.Key(urlsafe=game_key).get()
-        # check if the current player is in the game
-        user_id = self._getIdFromPlayer()
-        cancelled = False
-        if not user_id:
-            raise endpoints.UnauthorizedException('Authorization required')
-        elif user_id not in [game.playerOneId, game.playerTwoId]:
-            raise endpoints.UnauthorizedException('Only players can cancel \
-                games')
-        elif game.gameOver==True:
-            raise endpoints.UnauthorizedException('Can not cancel finished\
-                games')
-        else:
-            db.delete(game_key)  # game_key.delete() does not work
-        return BooleanMessage(data=cancelled)
-
-    # @endpoints.method(message_types.VoidMessage, BooleanMessage,
-    #                   path='delete_all_games', http_method='DELETE',
-    #                   name='deleteAllGames')
-    # def deleteAllGames(self, request):
-    #     """
-    #     deleting all Games created by current player, except those that are
-    #     played.
-    #     """
-    #     #keys_only:All operations return keys instead of entities.
-    #     # keys_non_active
-    #     ndb.delete_multi(Game.query().fetch(keys_only=True))
-    #     deleted = True
-    #     return BooleanMessage(data=deleted)
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='game/{websafeGameKey}',
@@ -502,16 +316,6 @@ class TictactoeApi(remote.Service):
         player.put()
         game.put()
         return BooleanMessage(data=retval)
-
-    # @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-    #                   path='game/{websafeGameKey}',
-    #                   http_method='POST', name='joinGame')
-    # def joinGame(self, request):
-    #     """
-    #     Register player for a selected game; can play against self-not
-    #     recommended.
-    #     """
-    #     return self._gameParticipation(request)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
                       path='game/{websafeGameKey}',
@@ -582,35 +386,6 @@ class TictactoeApi(remote.Service):
 
         return self._copyGameToForm(game)
 
-    @endpoints.method(message_types.VoidMessage, GamesForm,
-                      path='games_active',
-                      http_method='GET', name='getActiveGames')
-    def getActiveGames(self, request):
-        """
-        Get a list of games that the player has made moves in AND that have
-        not ended.
-        """
-        # get user profile
-        player = self._getProfileFromPlayer()
-        # get gamesInProgress from profile.
-        keys = getattr(player, 'gamesInProgress')
-        logging.debug('keys')
-        print 'keys', keys
-        if keys is None:
-            raise endpoints.NotFoundException(
-                'You have 0 gamesInProgress')
-        else:
-            safe_keys = []
-            for key in keys:  # to make key from wsks:ndb.Key(urlsafe=wsks)
-                safe_keys.append(ndb.Key(urlsafe=key))
-            games = ndb.get_multi(safe_keys)  # to fetch all keys at once
-            print 'games', games
-            if not games:
-                raise endpoints.NotFoundException('No games found')
-            else:
-                return GamesForm(
-                    items=[self._copyGameToForm(game) for game in games if game
-                    and game.gameOver is False])
 
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
         path='players_ranking', http_method='GET', name='playersRanking')
