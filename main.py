@@ -3,7 +3,7 @@
 import webapp2
 from google.appengine.api import app_identity
 from google.appengine.api import mail
-from tictactoe import TictactoeApi
+from api import TictactoeApi
 
 class SetAnnouncementHandler(webapp2.RequestHandler):
     def get(self):

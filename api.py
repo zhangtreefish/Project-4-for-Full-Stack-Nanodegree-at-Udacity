@@ -8,9 +8,9 @@ import endpoints
 import logging
 from additions.utils import getUserId
 from protorpc import messages, message_types, remote
-from models import PlayerForm, PlayerMiniForm, Player, ConflictException
+from models import PlayerForm, Player, ConflictException
 from models import Game, GameForm, GamesForm, ConflictException
-from models import PlayerRankForm, PlayersRankForm
+from models import PlayerRankForm, PlayersRankForm, PlayerMiniForm
 from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
 import base64
@@ -19,10 +19,10 @@ from utils import get_by_urlsafe
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
-# PLAYER_REQUEST = endpoints.ResourceContainer(
-#     message_types.VoidMessage,
-#     user_name=messages.StringField(1),
-#     email=messages.StringField(2))
+PLAYER_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    user_name=messages.StringField(1),
+    email=messages.StringField(2))
 GAME_CREATE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     name=messages.StringField(1),  # give the game a name
@@ -31,6 +31,10 @@ GAME_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
 )
+GAME_JOIN_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    player_name=messages.StringField(1),
+    websafeGameKey=messages.StringField(2))
 GAME_MOVE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
@@ -93,13 +97,13 @@ class TictactoeApi(remote.Service):
         return pf
 
 
-    def _getProfileFromPlayer(self):
+    def _getProfileFromUser(self):
         """
         Return player Profile from datastore, creating new one if
         non-existent.
         """
         # If the incoming method has a valid auth or ID token, endpoints.get_
-        # current_user() returns a User, otherwise it returns None.
+        # current_user() returns a user, otherwise it returns None.
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -168,13 +172,44 @@ class TictactoeApi(remote.Service):
             game.position1B==game.position2B==game.position3B!=None or
             game.position1C==game.position2C==game.position3C!=None)
 
-    @endpoints.method(message_types.VoidMessage, PlayerForm,
-                      path='player',
-                      http_method='GET',
-                      name='getPlayer')
-    def getPlayer(self, request):
-        """Return current player profile."""
-        return self._doProfile(True)
+    @endpoints.method(request_message=PLAYER_REQUEST,
+                      response_message=StringMessage,
+                      path='user',
+                      name='createPlayer',
+                      http_method='POST')
+    def createPlayer(self, request):
+        """
+        Create a Player. Requires a unique username; (an authenticated Google
+        user can create multiple Players as long as the entered username is
+        unique.)
+
+        """
+        if Player.query(Player.displayName == request.user_name).get():
+            raise endpoints.ConflictException(
+                    'A Player with that name already exists!')
+        player = Player(displayName=request.user_name, mainEmail=request.email)
+        player.put()
+        return StringMessage(data='Player {} created!'.format(
+                request.user_name))
+    @endpoints.method(request_message=PlayerMiniForm,
+                      response_message=StringMessage,
+                      path='userMINI',
+                      name='createPlayerMINI',
+                      http_method='POST')
+    def createPlayerMINI(self, request):
+        """
+        Create a Player. Requires a unique username; (an authenticated Google
+        user can create multiple Players as long as the entered username is
+        unique.)
+
+        """
+        if Player.query(Player.displayName == request.displayName).get():
+            raise endpoints.ConflictException(
+                    'A Player with that name already exists!')
+        player = Player(displayName=request.displayName)
+        player.put()
+        return StringMessage(data='Player {} created!'.format(
+                request.displayName))
 
     @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
@@ -182,7 +217,7 @@ class TictactoeApi(remote.Service):
                       name='createGame')
     def createGame(self, request):
         """
-        create a game
+        authenticated user creates a game of a chosen name
         """
         user = endpoints.get_current_user()
         if not user:
@@ -209,23 +244,23 @@ class TictactoeApi(remote.Service):
         gf = self._copyGameToForm(game)
         return gf
 
-    @endpoints.method(GAME_GET_REQUEST, GameForm,
+    @endpoints.method(GAME_JOIN_REQUEST, GameForm,
                       path='participate_game/{websafeGameKey}',
                       http_method='POST',
                       name='participateGame')
     def participateGame(self, request):
         """
-        authorized player participates in a game, can not play against self
+        a player participates in a game, can not play against self
         """
         # get the specified game
-        print '!!', request.websafeGameKey
+        print '!!', request.websafeGameKey, request.player_name
         game_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = game_key.get()
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: {}' .format(request.websafeGameKey))
         # get the authorized user id
-        player = self._getProfileFromPlayer()
+        player = Player.query(Player.displayName==request.player_name).get()
         if not player:
             raise endpoints.NotFoundException('No player found')
         # check if the player has already signed up
@@ -236,13 +271,13 @@ class TictactoeApi(remote.Service):
             # update the specified game
             else:
                 if game.playerOneId is None:
-                    setattr(game, 'playerOneId', player.key.urlsafe())
+                    setattr(game, 'playerOneId', request.player_name)
                     player.gamesInProgress.append(game_key.urlsafe())
                     # player.gamesTotal += 1
                     game.seatsAvailable -= 1
 
                 elif game.playerTwoId is None:
-                    game.playerTwoId = player.key.urlsafe()
+                    game.playerTwoId = request.player_name
                     player.gamesInProgress.append(game_key.urlsafe())
                     # player.gamesTotal += 1
                     game.seatsAvailable -= 1
@@ -318,7 +353,7 @@ class TictactoeApi(remote.Service):
         return BooleanMessage(data=retval)
 
     @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-                      path='game/{websafeGameKey}',
+                      path='leave_game/{websafeGameKey}',
                       http_method='DELETE', name='leaveGame')
     def leaveGame(self, request):
         """Cancel user for a selected game."""

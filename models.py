@@ -136,6 +136,10 @@ class GameForm(messages.Message):
     # playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
     # moveLogs = messages.MessageField(MoveForm, 16, repeated=True)
 
+class GameMiniForm(messages.Message):
+    """inbound form message for creating and participating game"""
+    name = messages.StringField(1)
+
 
 class GamesForm(messages.Message):
     """ multiple game outbound form message as response object"""
