@@ -47,7 +47,7 @@ class Player(ndb.Model):
 class Move(ndb.Model):
     """A Kind to record each move of a Game, call with Game as parent"""
     moveNumber = ndb.IntegerProperty()
-    playerNumber = ndb.StringProperty()
+    playerName = ndb.StringProperty()
     positionTaken = ndb.StringProperty()
 
 
@@ -77,7 +77,7 @@ class Game(ndb.Model):
 class MoveForm(messages.Message):
     """outbound form message as response object after making a move"""
     moveNumber = messages.IntegerField(1)
-    playerNumber = messages.StringField(2)
+    playerName = messages.StringField(2)
     positionTaken = messages.StringField(3)
 
 
@@ -106,7 +106,7 @@ class PlayerRankForm(messages.Message):
     displayName = messages.StringField(1)
     winsTotal = messages.IntegerField(2)
     gamesTotal = messages.IntegerField(3)
-    percentage = messages.StringField(4)
+    percentage = messages.FloatField(4)
 
 
 class PlayersRankForm(messages.Message):

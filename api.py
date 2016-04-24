@@ -38,7 +38,8 @@ GAME_JOIN_REQUEST = endpoints.ResourceContainer(
 GAME_MOVE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
-    positionTaken=messages.EnumField(PositionNumber, 2)
+    positionTaken=messages.EnumField(PositionNumber, 2),
+    player_name=messages.StringField(3)
 )
 
 MEMCACHE_ANNOUNCEMENTS_KEY = "Recent Announcements"
@@ -77,7 +78,8 @@ class TictactoeApi(remote.Service):
         gamesTotal = len(player.gamesCompleted)
         percentage = None
         if gamesTotal!=0:
-            percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
+            # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
+            percentage = float(winsTotal)/float(gamesTotal)
             print 'percentage', percentage
         setattr(prf, 'winsTotal', winsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)
@@ -381,13 +383,13 @@ class TictactoeApi(remote.Service):
         m_key = ndb.Key(Move, m_id, parent=g_key)
         print 'm_key', m_key.urlsafe()
 
-        player = self._getProfileFromPlayer()
+        player = Player.query(Player.displayName==request.player_name).get()
         if not player:
             raise endpoints.NotFoundException('no player found')
         # check if game is signed up by two players and by the current player
         if game.playerOneId is None or game.playerTwoId is None:
             raise endpoints.UnauthorizedException('Need 2 players to start')
-        if player.key.urlsafe() not in [game.playerTwoId, game.playerOneId]:
+        if player.displayName not in [game.playerTwoId, game.playerOneId]:
             raise endpoints.UnauthorizedException('You did not sign up')
 
         # check if the player had played the last move
@@ -398,7 +400,7 @@ class TictactoeApi(remote.Service):
             data = {}
             data['key'] = m_key
             data['moveNumber'] = game.gameCurrentMove + 1
-            data['playerNumber'] = player.key.urlsafe()
+            data['playerName'] = player.displayName
             data['positionTaken'] = str(request.positionTaken)
             Move(**data).put()
             move = m_key.get()
@@ -429,8 +431,9 @@ class TictactoeApi(remote.Service):
         a list consisting of each Player's name and the winning percentage
         """
         players = Player.query().fetch()
-        return PlayersRankForm(
-            items=[self._copyPlayerToRankForm(p) for p in players])
+        items=[self._copyPlayerToRankForm(p) for p in players]
+        sorted_items = sorted(items, key=lambda prf: prf.percentage, reverse=True)
+        return PlayersRankForm(items=sorted_items)
 
 
     @endpoints.method(GAME_GET_REQUEST, MovesForm,
