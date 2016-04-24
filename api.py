@@ -182,7 +182,7 @@ class TictactoeApi(remote.Service):
     def createPlayer(self, request):
         """
         Create a Player. Requires a unique username; (an authenticated Google
-        user can create multiple Players as long as the entered username is
+        user can create multiple Players as long as the entered user_name is
         unique.)
 
         """
@@ -193,25 +193,6 @@ class TictactoeApi(remote.Service):
         player.put()
         return StringMessage(data='Player {} created!'.format(
                 request.user_name))
-    @endpoints.method(request_message=PlayerMiniForm,
-                      response_message=StringMessage,
-                      path='userMINI',
-                      name='createPlayerMINI',
-                      http_method='POST')
-    def createPlayerMINI(self, request):
-        """
-        Create a Player. Requires a unique username; (an authenticated Google
-        user can create multiple Players as long as the entered username is
-        unique.)
-
-        """
-        if Player.query(Player.displayName == request.displayName).get():
-            raise endpoints.ConflictException(
-                    'A Player with that name already exists!')
-        player = Player(displayName=request.displayName)
-        player.put()
-        return StringMessage(data='Player {} created!'.format(
-                request.displayName))
 
     @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
@@ -246,22 +227,35 @@ class TictactoeApi(remote.Service):
         gf = self._copyGameToForm(game)
         return gf
 
+    @endpoints.method(message_types.VoidMessage, GamesForm,
+                      path='all_games', http_method='GET', name='allGames')
+    def allGames(self, request):
+        """
+        This returns all games ever created by anyone on this app, sorted by
+        seatsAvailable.
+        """
+        games = Game.query().fetch()
+        items=[self._copyGameToForm(game) for game in games]
+        # sort by
+        sorted_items = sorted(items, key=lambda gf: gf.seatsAvailable, reverse=True)
+        return GamesForm(items=sorted_items)
+
     @endpoints.method(GAME_JOIN_REQUEST, GameForm,
                       path='participate_game/{websafeGameKey}',
                       http_method='POST',
                       name='participateGame')
     def participateGame(self, request):
         """
-        a player participates in a game, can not play against self
+        Sign a player(identifiable by player_name) up for a game (identifiable
+        by key); can not play against self
         """
         # get the specified game
-        print '!!', request.websafeGameKey, request.player_name
         game_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = game_key.get()
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: {}' .format(request.websafeGameKey))
-        # get the authorized user id
+        # get the requested player
         player = Player.query(Player.displayName==request.player_name).get()
         if not player:
             raise endpoints.NotFoundException('No player found')
@@ -275,13 +269,11 @@ class TictactoeApi(remote.Service):
                 if game.playerOneId is None:
                     setattr(game, 'playerOneId', request.player_name)
                     player.gamesInProgress.append(game_key.urlsafe())
-                    # player.gamesTotal += 1
                     game.seatsAvailable -= 1
 
                 elif game.playerTwoId is None:
                     game.playerTwoId = request.player_name
                     player.gamesInProgress.append(game_key.urlsafe())
-                    # player.gamesTotal += 1
                     game.seatsAvailable -= 1
 
                 else:
