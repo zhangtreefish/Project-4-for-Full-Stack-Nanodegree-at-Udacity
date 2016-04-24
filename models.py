@@ -43,6 +43,33 @@ class Player(ndb.Model):
     # winsTotal = ndb.IntegerProperty()
     # gamesTotal = ndb.IntegerProperty()
 
+    def _copyPlayerToRankForm(self):
+        """Copy relevant fields from player to PlayerRankForm."""
+        prf = PlayerRankForm()
+
+        setattr(prf, 'displayName', getattr(self, 'displayName'))
+        gamesWon = set()
+        for g in self.gamesCompleted:
+            game = ndb.Key(urlsafe=g).get()
+
+            if game and game.gameWinner==self.displayName:
+                gamesWon.add(g)
+
+        # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
+        winsTotal = len(gamesWon)
+        gamesTotal = len(self.gamesCompleted)
+        percentage = 0.00
+        # rounded_pct = 0
+        if gamesTotal!=0:
+            # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
+            percentage = float(winsTotal)/float(gamesTotal)
+            # rounded_pct = int(np.round(percentage/0.01))*0.01
+        setattr(prf, 'winsTotal', winsTotal)
+        setattr(prf, 'gamesTotal', gamesTotal)
+        setattr(prf, 'percentage', percentage)
+        prf.check_initialized()
+        return prf
+
 
 class Move(ndb.Model):
     """A Kind to record each move of a Game, call with Game as parent"""
@@ -55,8 +82,8 @@ class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
     name = ndb.StringProperty()
     seatsAvailable = ndb.IntegerProperty(default=2)
-    playerOneId = ndb.StringProperty()
-    playerTwoId = ndb.StringProperty()
+    playerOne = ndb.StringProperty()
+    playerTwo = ndb.StringProperty()
     position1A = ndb.StringProperty()
     position1B = ndb.StringProperty()
     position1C = ndb.StringProperty()
@@ -117,8 +144,8 @@ class PlayersRankForm(messages.Message):
 class GameForm(messages.Message):
     """outbound form message as response object"""
     seatsAvailable = messages.IntegerField(1)
-    playerOneId = messages.StringField(2)
-    playerTwoId = messages.StringField(3)
+    playerOne = messages.StringField(2)
+    playerTwo = messages.StringField(3)
     # position1A = messages.EnumField(PlayerNumber, 4)
     position1A = messages.StringField(4)
     position1B = messages.StringField(5)

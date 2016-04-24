@@ -25,7 +25,8 @@ PLAYER_REQUEST = endpoints.ResourceContainer(
     email=messages.StringField(2))
 GAME_CREATE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
-    name=messages.StringField(1),  # give the game a name
+    game_name=messages.StringField(1),  # give the game a name
+    player_name=messages.StringField(2)
 )
 GAME_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
@@ -59,33 +60,7 @@ class TictactoeApi(remote.Service):
 
 # - - - Player objects - - - - - - - - - - - - - - - - - - -
 
-    def _copyPlayerToRankForm(self, player):
-        """Copy relevant fields from player to PlayerRankForm."""
-        prf = PlayerRankForm()
-        # all_fields: Gets all field definition objects. Returns an iterator
-        # over all values in arbitrary order.
-        setattr(prf, 'displayName', getattr(player, 'displayName'))
-        gamesWon = set()
-        for g in player.gamesCompleted:
-            game = ndb.Key(urlsafe=g).get()
 
-            if game and game.gameWinner==player.displayName:
-                gamesWon.add(g)
-
-        # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
-        winsTotal = len(gamesWon)
-        gamesTotal = len(player.gamesCompleted)
-        percentage = 0.00
-        # rounded_pct = 0
-        if gamesTotal!=0:
-            # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
-            percentage = float(winsTotal)/float(gamesTotal)
-            # rounded_pct = int(np.round(percentage/0.01))*0.01
-        setattr(prf, 'winsTotal', winsTotal)
-        setattr(prf, 'gamesTotal', gamesTotal)
-        setattr(prf, 'percentage', percentage)
-        prf.check_initialized()
-        return prf
 
     def _copyPlayerToForm(self, player):
         """Copy relevant fields from player to PlayerForm."""
@@ -97,49 +72,6 @@ class TictactoeApi(remote.Service):
                 setattr(pf, field.name, getattr(player, field.name))
         pf.check_initialized()
         return pf
-
-
-    def _getProfileFromUser(self):
-        """
-        Return player Profile from datastore, creating new one if
-        non-existent.
-        """
-        # If the incoming method has a valid auth or ID token, endpoints.get_
-        # current_user() returns a user, otherwise it returns None.
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
-        player_key = ndb.Key(Player, user_id)
-        player = player_key.get()
-        if not player:
-            player = Player(
-                key=player_key,
-                displayName=user.nickname(),
-                mainEmail=user.email(),
-                gamesInProgress=[],
-                gamesCompleted=[])
-            player.put()
-        return player
-
-    def _doProfile(self, edit_request=None):
-        """
-        Get player Profile and return to player, possibly updating it first.
-        """
-        # get user Profile
-        player = self._getProfileFromPlayer()
-
-        # if saveProfile(), process user-modifiable fields
-        if edit_request:
-            for field in ['displayName']:
-                if hasattr(edit_request, field):
-                    val = getattr(edit_request, field)
-                    if val:
-                        setattr(player, field, str(val))
-            player.put()
-
-        # return ProfileForm
-        return self._copyPlayerToForm(player)
 
     def _copyGameToForm(self, game):
         """Copy relevant fields from Game to GameForm."""
@@ -177,7 +109,7 @@ class TictactoeApi(remote.Service):
     @endpoints.method(request_message=PLAYER_REQUEST,
                       response_message=StringMessage,
                       path='user',
-                      name='createPlayer',
+                      name='create_player',
                       http_method='POST')
     def createPlayer(self, request):
         """
@@ -197,38 +129,42 @@ class TictactoeApi(remote.Service):
     @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
                       http_method='POST',
-                      name='createGame')
+                      name='create_game')
     def createGame(self, request):
         """
         authenticated user creates a game of a chosen name
         """
-        user = endpoints.get_current_user()
-        if not user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user_id = getUserId(user)
-        p_key = ndb.Key(Player, user_id)
-        player = p_key.get()
-        # allocate new Game ID with Player key as parent
-        # allocate_ids(size=None, max=None, parent=None, **ctx_options)
-        # returns a tuple with (start, end) for the allocated range, inclusive.
-        g_id = Game.allocate_ids(size=1, parent=p_key)[0]
-        # make Game key from ID
-        g_key = ndb.Key(Game, g_id, parent=p_key)
-        data = {}  # is a dict
-        data['key'] = g_key
-        data['name'] = request.name
-        Game(**data).put()
+        player= Player.query(Player.displayName==request.player_name).get()
+        p_key = player.key
+        if not player:
+            raise endpoints.NotFoundException(
+                'No player found with name: {}' .format(request.player_name))
+        else:
+            # allocate new Game ID with Player key as parent
+            # allocate_ids(size=None, max=None, parent=None, **ctx_options)
+            # returns a tuple with (start, end) for the allocated range, inclusive.
+            g_id = Game.allocate_ids(size=1, parent=p_key)[0]
+            # make Game key from ID; assign values
+            g_key = ndb.Key(Game, g_id, parent=p_key)
+            data = {}  # is a dict
+            data['key'] = g_key
+            data['name'] = request.game_name
+            # data['playerOne'] = request.player_name
+            # data['seatsAvailable'] = 1
+            # player.gamesInProgress.append(g_key.urlsafe())
+            Game(**data).put()
+            # player.put()
 
-        taskqueue.add(params={'email': user.email(),
-                      'gameInfo': repr(request)},
-                      url='/tasks/send_confirmation_email')
-        game = g_key.get()
-        print 'game', game
-        gf = self._copyGameToForm(game)
-        return gf
+            taskqueue.add(params={'email': player.mainEmail,
+                          'gameInfo': repr(request)},
+                          url='/tasks/send_confirmation_email')
+            game = g_key.get()
+            print 'game', game
+            gf = self._copyGameToForm(game)
+            return gf
 
     @endpoints.method(message_types.VoidMessage, GamesForm,
-                      path='all_games', http_method='GET', name='allGames')
+                      path='all_games', http_method='GET', name='all_games')
     def allGames(self, request):
         """
         This returns all games ever created by anyone on this app, sorted by
@@ -243,49 +179,51 @@ class TictactoeApi(remote.Service):
     @endpoints.method(GAME_JOIN_REQUEST, GameForm,
                       path='participate_game/{websafeGameKey}',
                       http_method='POST',
-                      name='participateGame')
+                      name='participate_game')
     def participateGame(self, request):
         """
         Sign a player(identifiable by player_name) up for a game (identifiable
         by key); can not play against self
         """
-        # get the specified game
-        game_key = ndb.Key(urlsafe=request.websafeGameKey)
-        game = game_key.get()
-        if not game:
-            raise endpoints.NotFoundException(
-                'No game found with key: {}' .format(request.websafeGameKey))
-        # get the requested player
-        player = Player.query(Player.displayName==request.player_name).get()
-        if not player:
-            raise endpoints.NotFoundException('No player found')
-        # check if the player has already signed up
-        else:
-            if game_key.urlsafe() in player.gamesInProgress:
-                raise ConflictException(
-                    "You have already registered for this game")
-            # update the specified game
-            else:
-                if game.playerOneId is None:
-                    setattr(game, 'playerOneId', request.player_name)
-                    player.gamesInProgress.append(game_key.urlsafe())
-                    game.seatsAvailable -= 1
+        return self._gameParticipation(request, True)
+        # # get the specified game
+        # game_key = ndb.Key(urlsafe=request.websafeGameKey)
+        # game = game_key.get()
+        # if not game:
+        #     raise endpoints.NotFoundException(
+        #         'No game found with key: {}' .format(request.websafeGameKey))
+        # # get the requested player
+        # player = Player.query(Player.displayName==request.player_name).get()
+        # if not player:
+        #     raise endpoints.NotFoundException(
+        #         'No player with name {} found' .format(request.player_name))
+        # # check if the player has already signed up
+        # else:
+        #     if game_key.urlsafe() in player.gamesInProgress:
+        #         raise ConflictException(
+        #             "You have already registered for this game")
+        #     # update the specified game
+        #     else:
+        #         if game.playerOne is None:
+        #             setattr(game, 'playerOne', request.player_name)
+        #             player.gamesInProgress.append(game_key.urlsafe())
+        #             game.seatsAvailable -= 1
 
-                elif game.playerTwoId is None:
-                    game.playerTwoId = request.player_name
-                    player.gamesInProgress.append(game_key.urlsafe())
-                    game.seatsAvailable -= 1
+        #         elif game.playerTwo is None:
+        #             game.playerTwo = request.player_name
+        #             player.gamesInProgress.append(game_key.urlsafe())
+        #             game.seatsAvailable -= 1
 
-                else:
-                    raise endpoints.UnauthorizedException('Sorry, both spots taken!')
-                game.put()
-                player.put()
+        #         else:
+        #             raise endpoints.UnauthorizedException('Sorry, both spots taken!')
+        #         game.put()
+        #         player.put()
 
-        return self._copyGameToForm(game)
+        # return self._copyGameToForm(game)
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='game/{websafeGameKey}',
-                      http_method='GET', name='getGame')
+                      http_method='GET', name='get_game')
     def getGame(self, request):
         """Return requested game (by websafeGameKey)."""
         # get Game object from request; bail if not found
@@ -297,66 +235,81 @@ class TictactoeApi(remote.Service):
         return self._copyGameToForm(game)
 
     # # - - - Registration - - - - - - - - - - - - - - - - - - - -
-    @ndb.transactional(xg=True)
+    @ndb.transactional(xg=True)  # TODO: can not get player through user_name
     def _gameParticipation(self, request, reg=True):
         """Register or unregister player for a selected game."""
+        gf = GameForm()
         retval = None
-        player = self._getProfileFromPlayer()  # get user Profile
-
         # check if game exists given websafeConfKey
-        g_key = request.websafeGameKey
-        game = ndb.Key(urlsafe=g_key).get()
+        g_key = ndb.Key(urlsafe=request.websafeGameKey)
+        game = g_key.get()
         if not game:
             raise endpoints.NotFoundException(
                 'No game found with key: %s' % g_key)
+        # get player using ancester relationship
+        player = g_key.parent().get()
+        if not player:
+            raise endpoints.NotFoundException(
+                'No player with name %s found' .format(request.player_name))
 
         # register
         if reg:
             if game.seatsAvailable <= 0:  # check if seats avail
                 raise ConflictException(
                     "There are no seats available.")
+            elif g_key.urlsafe() in player.gamesInProgress:
+                    raise ConflictException(
+                        "You have already registered for this game")
             else:
                 # register user, take away one seat
                 if game.seatsAvailable == 1:  #register user
-                    game.playerTwoId = player.key.urlsafe()
+                    game.playerTwo = player.displayName
                 elif game.seatsAvailable == 2:
-                    game.playerOneId = player.key.urlsafe()
-                player.gamesInProgress.append(g_key)  # update player profile
+                    game.playerOne = player.displayName
+                player.gamesInProgress.append(g_key.urlsafe())  # update player profile
                 game.seatsAvailable -= 1  # take away 1 seat
                 retval = True
 
-        # unregister
+        # unregister: players are not permitted to remove completed games.
         else:
             # check if user already registered
-            if g_key in player.gamesInProgress:
+            if g_key in player.gamesCompleted:
+                raise endpoints.UnauthorizedException(
+                    'Player can not cancel completed games')
+            elif g_key in player.gamesInProgress:
                 # cancel player, add back one seat
-                player.gamesInProgress.remove(g_key)
+                player.gamesInProgress.remove(g_key.urlsafe())
                 game.seatsAvailable += 1
                 # update game's player status
-                if player.key.urlsafe() == game.playerOneId:
-                    game.playerOneId = None
-                if player.key.urlsafe() == game.playerTwoId:
-                    game.playerTwoId = None
+                if player.displayName == game.playerOne:
+                    game.playerOne = None
+                if player.displayName == game.playerTwo:
+                    game.playerTwo = None
                 retval = True
             else:
+                raise endpoints.NotFoundException(
+                    'Player does not have created game {} in progress' .format(g_key.urlsafe()))
                 retval = False
 
         # write things back to the datastore & return
         player.put()
         game.put()
-        return BooleanMessage(data=retval)
-
-    @endpoints.method(GAME_GET_REQUEST, BooleanMessage,
-                      path='leave_game/{websafeGameKey}',
-                      http_method='DELETE', name='leaveGame')
-    def leaveGame(self, request):
-        """Cancel user for a selected game."""
+        return self._copyGameToForm(game)
+# TODO: Player does not have created game  in progress
+    @endpoints.method(GAME_JOIN_REQUEST, GameForm,
+                      path='cancel_game/{websafeGameKey}',
+                      http_method='DELETE', name='cancel_game_by_creator')
+    def cancelGame(self, request):
+        """
+        Creator of a game cancel user from that game.
+        Players are not permitted to remove completed games.
+        """
         return self._gameParticipation(request, False)
 
     @endpoints.method(GAME_MOVE_REQUEST, GameForm,
                       path='make_move/{websafeGameKey}/{positionTaken}',
                       http_method='POST',
-                      name='makeMove')
+                      name='make_move')
     def makeMove(self, request):
         """
         authenticated player makes a move, implemented by creating a move,
@@ -379,9 +332,9 @@ class TictactoeApi(remote.Service):
         if not player:
             raise endpoints.NotFoundException('no player found')
         # check if game is signed up by two players and by the current player
-        if game.playerOneId is None or game.playerTwoId is None:
+        if game.playerOne is None or game.playerTwo is None:
             raise endpoints.UnauthorizedException('Need 2 players to start')
-        if player.displayName not in [game.playerTwoId, game.playerOneId]:
+        if player.displayName not in [game.playerTwo, game.playerOne]:
             raise endpoints.UnauthorizedException('You did not sign up')
 
         # check if the player had played the last move
@@ -417,20 +370,20 @@ class TictactoeApi(remote.Service):
 
 
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
-        path='players_ranking', http_method='GET', name='playersRanking')
+        path='players_ranking', http_method='GET', name='get_user_rankings')
     def getPlayerRankings(self, request):
         """
         a list consisting of each Player's name and the winning percentage
         """
         players = Player.query().fetch()
-        items=[self._copyPlayerToRankForm(p) for p in players]
+        items=[p._copyPlayerToRankForm() for p in players]
         sorted_items = sorted(items, key=lambda prf: prf.percentage, reverse=True)
         return PlayersRankForm(items=sorted_items)
 
 
     @endpoints.method(GAME_GET_REQUEST, MovesForm,
                       path='game_history/{websafeGameKey}',
-                      http_method='GET', name='gameHistory')
+                      http_method='GET', name='get_game_history')
     def getGameHistory(self, request):
         """ shows a list of all the moves for each game"""
         game = ndb.Key(urlsafe=request.websafeGameKey).get()

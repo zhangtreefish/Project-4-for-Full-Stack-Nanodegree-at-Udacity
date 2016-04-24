@@ -40,3 +40,27 @@ decorator like '@ndb.transactional(xg=True)' should be required for makeMove
 Adding '@ndb.transactional(xg=True)' just above 'def makeMove' broke the
 method with 'AttributeError: 'TransactionalConnection' object has no attribute
 'async_allocate_ids'
+
+Reflections on the first review:
+1.'You seem to be trying to implement your own version of some of the features
+ that Google takes care of behind the scene, like user authentication.': I did
+ not implement my own version of user authentication, rather, I did not
+ uncouple user from the player: in my first submission, the user is the player,
+ and one user becomes the (one and only) player, like so:
+
+user_id = getUserId(user)
+
+p_key = ndb.Key(Player, user_id)
+
+ that could be limiting in the game app where a user may want to assume
+ multiple personas.  So I uncoupled that in the second submission (also see 4).
+2.'All the endpoints and methods should be the same': I renamed methods to
+ conform to the sample app, and removed additional methods that were not in
+ the sample app.
+3. 'once you change your models, you'll want to rewrite the make_move logic to
+take advantage of the new structure': I am not sure what was wrong with my
+models in the first_submission version, and what 'new structure' I should go
+for.
+4.'You should have a Resource Container for the players!'A resource container
+for Player becomes necessary once I decoupled user from Player (see 1), so I
+added that.
