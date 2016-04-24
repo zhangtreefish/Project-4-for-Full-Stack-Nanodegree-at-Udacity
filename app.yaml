@@ -30,3 +30,6 @@ libraries:
 # pycrypto library used for OAuth2 (req'd for authenticated APIs)
 - name: pycrypto
   version: latest
+
+# - name: numpy
+#   version: "1.6.1"

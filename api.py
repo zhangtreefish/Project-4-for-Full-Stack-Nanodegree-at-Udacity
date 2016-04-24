@@ -14,7 +14,7 @@ from models import PlayerRankForm, PlayersRankForm, PlayerMiniForm
 from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
 from google.appengine.ext import ndb
 import base64
-from utils import get_by_urlsafe
+# import numpy as np
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -67,20 +67,20 @@ class TictactoeApi(remote.Service):
         setattr(prf, 'displayName', getattr(player, 'displayName'))
         gamesWon = set()
         for g in player.gamesCompleted:
-            game = get_by_urlsafe(g, Game)
+            game = ndb.Key(urlsafe=g).get()
 
-            print 'g', g
             if game and game.gameWinner==player.displayName:
                 gamesWon.add(g)
 
         # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
         winsTotal = len(gamesWon)
         gamesTotal = len(player.gamesCompleted)
-        percentage = None
+        percentage = 0.00
+        # rounded_pct = 0
         if gamesTotal!=0:
             # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
             percentage = float(winsTotal)/float(gamesTotal)
-            print 'percentage', percentage
+            # rounded_pct = int(np.round(percentage/0.01))*0.01
         setattr(prf, 'winsTotal', winsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)
         setattr(prf, 'percentage', percentage)
@@ -433,7 +433,7 @@ class TictactoeApi(remote.Service):
                       http_method='GET', name='gameHistory')
     def getGameHistory(self, request):
         """ shows a list of all the moves for each game"""
-        game = get_by_urlsafe(request.websafeGameKey, Game)
+        game = ndb.Key(urlsafe=request.websafeGameKey).get()
         game_key = game.key
         moves = Move.query(ancestor=game_key).fetch()
         if not moves:
