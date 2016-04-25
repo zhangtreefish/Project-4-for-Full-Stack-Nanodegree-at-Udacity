@@ -66,25 +66,6 @@ class Player(ndb.Model):
         return prf
 
 
-class Move(ndb.Model):
-    """A Kind to record each move of a Game, call with Game as parent"""
-    moveNumber = ndb.IntegerProperty()
-    playerName = ndb.StringProperty()
-    positionTaken = ndb.StringProperty()
-
-    @property
-    def _copyMoveToForm(self):
-        """Copy relevant fields from Move to MoveForm."""
-        mf = MoveForm()
-        # all_fields: Gets all field definition objects. Returns an iterator
-        # over all values in arbitrary order.
-        for field in mf.all_fields():
-            if hasattr(self, field.name):
-                setattr(mf, field.name, getattr(self, field.name))
-        mf.check_initialized()
-        return mf
-
-
 class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
     name = ndb.StringProperty()
@@ -132,16 +113,24 @@ class Game(ndb.Model):
             self.position1C==self.position2C==self.position3C!=None)
 
 
-class MoveForm(messages.Message):
-    """outbound form message as response object after making a move"""
-    moveNumber = messages.IntegerField(1)
-    playerName = messages.StringField(2)
-    positionTaken = messages.StringField(3)
+class Move(ndb.Model):
+    """A Kind to record each move of a Game, call with Game as parent"""
+    moveNumber = ndb.IntegerProperty()
+    playerName = ndb.StringProperty()
+    positionTaken = ndb.StringProperty()
 
+    @property
+    def _copyMoveToForm(self):
+        """Copy relevant fields from Move to MoveForm."""
+        mf = MoveForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        for field in mf.all_fields():
+            if hasattr(self, field.name):
+                setattr(mf, field.name, getattr(self, field.name))
+        mf.check_initialized()
+        return mf
 
-class MovesForm(messages.Message):
-    """outbound message as response object of a game history query"""
-    items = messages.MessageField(MoveForm, 1, repeated=True)
 
 class PlayerMiniForm(messages.Message):
     """ as inbound request message"""
@@ -203,12 +192,18 @@ class GamesForm(messages.Message):
     items = messages.MessageField(GameForm, 1, repeated=True)
 
 
+class MoveForm(messages.Message):
+    """outbound form message as response object after making a move"""
+    moveNumber = messages.IntegerField(1)
+    playerName = messages.StringField(2)
+    positionTaken = messages.StringField(3)
+
+
+class MovesForm(messages.Message):
+    """outbound message as response object of a game history query"""
+    items = messages.MessageField(MoveForm, 1, repeated=True)
+
+
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
-
-
-# needed for conference registration
-class BooleanMessage(messages.Message):
-    """BooleanMessage-- outbound Boolean value message"""
-    data = messages.BooleanField(1)
