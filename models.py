@@ -72,21 +72,12 @@ class Game(ndb.Model):
     seatsAvailable = ndb.IntegerProperty(default=2)
     playerOne = ndb.StringProperty()
     playerTwo = ndb.StringProperty()
-    position1A = ndb.StringProperty()
-    position1B = ndb.StringProperty()
-    position1C = ndb.StringProperty()
-    position2A = ndb.StringProperty()
-    position2B = ndb.StringProperty()
-    position2C = ndb.StringProperty()
-    position3A = ndb.StringProperty()
-    position3B = ndb.StringProperty()
-    position3C = ndb.StringProperty()
+    board = ndb.PickleProperty()
     # moveLogs = ndb.StructuredProperty(Move, repeated=True)
     gameCurrentMove = ndb.IntegerProperty(default=0)
     lastPlayer = ndb.StringProperty()
     gameOver = ndb.BooleanProperty(default=False)
     gameWinner = ndb.StringProperty()
-    # gameCancelled = ndb.BooleanProperty()
 
     @property
     def _copyGameToForm(self):
@@ -97,27 +88,29 @@ class Game(ndb.Model):
                 setattr(gf, field.name, getattr(self, field.name))
             elif field.name == "websafeKey":
                 setattr(gf, field.name, self.key.urlsafe())
+            elif field.name == "gameBoard":
+                setattr(gf, field.name, ' '.join(getattr(self, 'board')))
         gf.check_initialized()
         return gf
 
     @property
     def _isWon(self):
         """when the tic-tac-toe game comes to a winning connection"""
-        return (self.position1A==self.position2B==self.position3C!=None or
-            self.position1A==self.position2B==self.position3C!=None or
-            self.position1A==self.position1B==self.position1C!=None or
-            self.position2A==self.position2B==self.position2C!=None or
-            self.position3A==self.position3B==self.position3C!=None or
-            self.position1A==self.position2A==self.position3A!=None or
-            self.position1B==self.position2B==self.position3B!=None or
-            self.position1C==self.position2C==self.position3C!=None)
+        return (self.board[0]==self.board[4]==self.board[8]!='' or
+            self.board[2]==self.board[4]==self.board[6]!='' or
+            self.board[0]==self.board[1]==self.board[2]!='' or
+            self.board[3]==self.board[4]==self.board[5]!='' or
+            self.board[6]==self.board[7]==self.board[8]!='' or
+            self.board[0]==self.board[3]==self.board[6]!='' or
+            self.board[1]==self.board[4]==self.board[7]!='' or
+            self.board[2]==self.board[5]==self.board[8]!='')
 
 
 class Move(ndb.Model):
     """A Kind to record each move of a Game, call with Game as parent"""
     moveNumber = ndb.IntegerProperty()
     playerName = ndb.StringProperty()
-    positionTaken = ndb.StringProperty()
+    positionTaken = ndb.IntegerProperty()
 
     @property
     def _copyMoveToForm(self):
@@ -163,23 +156,16 @@ class PlayersRankForm(messages.Message):
 
 class GameForm(messages.Message):
     """outbound form message as response object"""
-    seatsAvailable = messages.IntegerField(1)
-    playerOne = messages.StringField(2)
-    playerTwo = messages.StringField(3)
-    position1A = messages.StringField(4)
-    position1B = messages.StringField(5)
-    position1C = messages.StringField(6)
-    position2A = messages.StringField(7)
-    position2B = messages.StringField(8)
-    position2C = messages.StringField(9)
-    position3A = messages.StringField(10)
-    position3B = messages.StringField(11)
-    position3C = messages.StringField(12)
-    gameOver = messages.BooleanField(13)
-    gameCurrentMove = messages.IntegerField(14)
-    websafeKey = messages.StringField(15)
-    name = messages.StringField(16)
-    lastPlayer = messages.StringField(17)
+    websafeKey = messages.StringField(1)
+    name = messages.StringField(2)
+    seatsAvailable = messages.IntegerField(3)
+    gameBoard = messages.StringField(4)
+    playerOne = messages.StringField(5)
+    playerTwo = messages.StringField(6)
+    gameCurrentMove = messages.IntegerField(7)
+    lastPlayer = messages.StringField(8)
+    gameOver = messages.BooleanField(9)
+    gameWinner = messages.StringField(10)
 
 
 class GameMiniForm(messages.Message):
@@ -196,7 +182,7 @@ class MoveForm(messages.Message):
     """outbound form message as response object after making a move"""
     moveNumber = messages.IntegerField(1)
     playerName = messages.StringField(2)
-    positionTaken = messages.StringField(3)
+    positionTaken = messages.IntegerField(3)
 
 
 class MovesForm(messages.Message):
@@ -207,3 +193,8 @@ class MovesForm(messages.Message):
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
+
+
+class BooleanMessage(messages.Message):
+    """BooleanMessage-- outbound Boolean value message"""
+    data = messages.BooleanField(1)

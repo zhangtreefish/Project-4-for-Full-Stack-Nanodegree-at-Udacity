@@ -8,10 +8,10 @@ import logging
 from protorpc import messages, message_types, remote
 from models import PlayerForm, Player, ConflictException
 from models import Game, GameForm, GamesForm
-from models import PlayersRankForm
+from models import PlayersRankForm, BooleanMessage
 from models import Move, MovesForm, PositionNumber
 from google.appengine.ext import ndb
-import base64
+import pickle
 # import numpy as np
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -40,7 +40,7 @@ GAME_JOIN_REQUEST = endpoints.ResourceContainer(
 GAME_MOVE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeGameKey=messages.StringField(1),
-    positionTaken=messages.EnumField(PositionNumber, 2),
+    positionTaken=messages.IntegerField(2),
     player_name=messages.StringField(3)
 )
 
@@ -87,7 +87,6 @@ class TictactoeApi(remote.Service):
         a player creates a game of a unique name
         """
         player= Player.query(Player.displayName==request.player_name).get()
-        p_key = player.key
         if not player:
             raise endpoints.NotFoundException(
                 'No player found with name: {}' .format(request.player_name))
@@ -98,12 +97,14 @@ class TictactoeApi(remote.Service):
             # allocate new Game ID with Player key as parent
             # allocate_ids(size=None, max=None, parent=None, **ctx_options)
             # returns a tuple with (start, end) for the allocated range, inclusive.
+            p_key = player.key
             g_id = Game.allocate_ids(size=1, parent=p_key)[0]
             # make Game key from ID; assign initial values to the game entity
             g_key = ndb.Key(Game, g_id, parent=p_key)
             data = {}  # is a dict
             data['key'] = g_key
             data['name'] = request.game_name
+            data['board'] = ['' for _ in range(9)]
             Game(**data).put()
 
             taskqueue.add(params={'email': player.mainEmail,
@@ -245,7 +246,7 @@ class TictactoeApi(remote.Service):
                 'Not a single game has this player {} signed up for' .format(
                 request.player_name))
         return GamesForm(
-            items=[game._copyGameToForm for game in games])
+            items=[game._copyGameToForm for game in games if game])
 
     @endpoints.method(GAME_MOVE_REQUEST, GameForm,
                       path='make_move/{websafeGameKey}/{positionTaken}',
@@ -281,19 +282,21 @@ class TictactoeApi(remote.Service):
             raise endpoints.UnauthorizedException(
                 "Player {}, it is your opponent {}'s turn" .format(
                     game.playerOne, game.playerTwo))
+        elif game.board[request.positionTaken]!='':
+            raise endpoints.UnauthorizedException('The game board position {} \
+             is already taken' .format(request.positionTaken))
         else:
             data = {}
             data['key'] = m_key
             data['moveNumber'] = game.gameCurrentMove + 1
             data['playerName'] = player.displayName
-            data['positionTaken'] = str(request.positionTaken)
+            data['positionTaken'] = request.positionTaken
             Move(**data).put()
             move = m_key.get()
 
             # Update Game on the position affected by the move, as well as player
             game.gameCurrentMove += 1
-            setattr(game, str(request.positionTaken), getattr(player,
-                    'displayName'))
+            game.board[request.positionTaken] = request.player_name
             setattr(game, 'lastPlayer', getattr(player,
                     'displayName'))
             if game._isWon:
@@ -307,6 +310,20 @@ class TictactoeApi(remote.Service):
             player.put()
 
         return game._copyGameToForm
+
+
+    @endpoints.method(message_types.VoidMessage, BooleanMessage,
+                      path='delete_all_games', http_method='POST',
+                      name='delete_all_games')
+    def deleteAllGames(self, request):
+        """
+        deleting all Games created by current player, except those that are
+        played.
+        """
+        #keys_only:All operations return keys instead of entities.
+        ndb.delete_multi(Game.query().fetch(keys_only=True))
+        deleted = True
+        return BooleanMessage(data=deleted)
 
 
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
