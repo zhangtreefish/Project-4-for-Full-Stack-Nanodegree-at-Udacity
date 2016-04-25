@@ -1,17 +1,11 @@
-#!/usr/bin/env python
-
 import httplib
 import endpoints
 from protorpc import messages
 from google.appengine.ext import ndb
 
-
-class PlayerNumber(messages.Enum):
-    """To denote the player and game piece during the moves"""
-    NOT_SPECIFIED = 1
-    One = 2
-    Two = 3
-
+class ConflictException(endpoints.ServiceException):
+    """ConflictException -- exception mapped to HTTP 409 response"""
+    http_status = httplib.CONFLICT
 
 class PositionNumber(messages.Enum):
     """To denote the player and game piece during the moves"""
@@ -26,22 +20,12 @@ class PositionNumber(messages.Enum):
     position3B = 9
     position3C = 10
 
-
-class ConflictException(endpoints.ServiceException):
-    """ConflictException -- exception mapped to HTTP 409 response"""
-    http_status = httplib.CONFLICT
-
-
 class Player(ndb.Model):
     """A Kind to represent player profile"""
-    # Id = ndb.StringProperty()  # Should  Id be here or not?
-    # use MD5 hash of the email to use as id
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
     gamesInProgress = ndb.StringProperty(repeated=True)  # games signed up for
     gamesCompleted = ndb.StringProperty(repeated=True)
-    # winsTotal = ndb.IntegerProperty()
-    # gamesTotal = ndb.IntegerProperty()
 
     @property
     def _copyPlayerToForm(self):
@@ -67,7 +51,6 @@ class Player(ndb.Model):
             if game and game.gameWinner==self.displayName:
                 gamesWon.add(g)
 
-        # gamesWon = [g if g.gameWinner==player.displayName for g in player.gamesInProgress]
         winsTotal = len(gamesWon)
         gamesTotal = len(self.gamesCompleted)
         percentage = 0.00
@@ -194,7 +177,6 @@ class GameForm(messages.Message):
     seatsAvailable = messages.IntegerField(1)
     playerOne = messages.StringField(2)
     playerTwo = messages.StringField(3)
-    # position1A = messages.EnumField(PlayerNumber, 4)
     position1A = messages.StringField(4)
     position1B = messages.StringField(5)
     position1C = messages.StringField(6)
@@ -208,8 +190,8 @@ class GameForm(messages.Message):
     gameCurrentMove = messages.IntegerField(14)
     websafeKey = messages.StringField(15)
     name = messages.StringField(16)
-    # playerCurrentTurn = messages.EnumField(PlayerNumber, 16)
-    # moveLogs = messages.MessageField(MoveForm, 16, repeated=True)
+    lastPlayer = messages.StringField(17)
+
 
 class GameMiniForm(messages.Message):
     """inbound form message for creating and participating game"""

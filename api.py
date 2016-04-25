@@ -1,17 +1,15 @@
 from google.appengine.api import memcache
 from models import StringMessage
-from models import BooleanMessage
 from google.appengine.ext import db
 from google.appengine.api import taskqueue
 from settings import WEB_CLIENT_ID
 import endpoints
 import logging
-from additions.utils import getUserId
 from protorpc import messages, message_types, remote
 from models import PlayerForm, Player, ConflictException
-from models import Game, GameForm, GamesForm, ConflictException
-from models import PlayerRankForm, PlayersRankForm, PlayerMiniForm
-from models import PositionNumber, PlayerNumber, Move, MoveForm, MovesForm
+from models import Game, GameForm, GamesForm
+from models import PlayersRankForm
+from models import Move, MovesForm, PositionNumber
 from google.appengine.ext import ndb
 import base64
 # import numpy as np
