@@ -23,6 +23,9 @@ PLAYER_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     user_name=messages.StringField(1),
     email=messages.StringField(2))
+PLAYER_MINI_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    player_name=messages.StringField(1))
 GAME_CREATE_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     game_name=messages.StringField(1),  # give the game a name
@@ -235,6 +238,28 @@ class TictactoeApi(remote.Service):
         game.put()
         return game._copyGameToForm()
 
+    @endpoints.method(PLAYER_MINI_REQUEST, GamesForm,
+                      path='games', http_method='GET', name='get_user_games')
+    def getPlayerGames(self, request):
+        """
+        This returns all games a player has signed up for but has not
+        completed, i.e., those in the gamesInProgress list.
+        """
+        player = Player.query(Player.displayName==request.player_name).get()
+        game_keys =getattr(player,'gamesInProgress')
+
+        key_objects=[ndb.Key(urlsafe=key) for key in game_keys]
+
+        # Use get_multi(array_of_keys) to fetch all games at once.
+        games = ndb.get_multi(key_objects)
+
+        if not games:
+            raise endpoints.NotFoundException(
+                'Not a single game has this player {} signed up for' .format(
+                request.player_name))
+        return GamesForm(
+            items=[game._copyGameToForm() for game in games])
+
     @endpoints.method(GAME_MOVE_REQUEST, GameForm,
                       path='make_move/{websafeGameKey}/{positionTaken}',
                       http_method='POST',
@@ -250,7 +275,6 @@ class TictactoeApi(remote.Service):
         # create a move
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
-        print 'm_key', m_key.urlsafe()
 
         player = Player.query(Player.displayName==request.player_name).get()
 
@@ -258,7 +282,8 @@ class TictactoeApi(remote.Service):
             raise endpoints.UnauthorizedException('This game is already won.')
         # check if game is signed up by two players and by the current player
         elif game.playerOne is None or game.playerTwo is None:
-            raise endpoints.UnauthorizedException('Need 2 players to start')
+            raise endpoints.UnauthorizedException(
+                'Need 2 signed-up players to start')
         elif not player:
             raise endpoints.NotFoundException('no player found')
                # check if the game is already completed
