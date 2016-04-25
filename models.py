@@ -43,6 +43,7 @@ class Player(ndb.Model):
     # winsTotal = ndb.IntegerProperty()
     # gamesTotal = ndb.IntegerProperty()
 
+    @property
     def _copyPlayerToForm(self):
         """Copy relevant fields from player to PlayerForm."""
         pf = PlayerForm()
@@ -54,6 +55,7 @@ class Player(ndb.Model):
         pf.check_initialized()
         return pf
 
+    @property
     def _copyPlayerToRankForm(self):
         """Copy relevant fields from player to PlayerRankForm."""
         prf = PlayerRankForm()
@@ -62,7 +64,6 @@ class Player(ndb.Model):
         gamesWon = set()
         for g in self.gamesCompleted:
             game = ndb.Key(urlsafe=g).get()
-
             if game and game.gameWinner==self.displayName:
                 gamesWon.add(g)
 
@@ -88,6 +89,7 @@ class Move(ndb.Model):
     playerName = ndb.StringProperty()
     positionTaken = ndb.StringProperty()
 
+    @property
     def _copyMoveToForm(self):
         """Copy relevant fields from Move to MoveForm."""
         mf = MoveForm()
@@ -122,6 +124,7 @@ class Game(ndb.Model):
     gameWinner = ndb.StringProperty()
     # gameCancelled = ndb.BooleanProperty()
 
+    @property
     def _copyGameToForm(self):
         """Copy relevant fields from Game to GameForm."""
         gf = GameForm()
@@ -132,6 +135,19 @@ class Game(ndb.Model):
                 setattr(gf, field.name, self.key.urlsafe())
         gf.check_initialized()
         return gf
+
+    @property
+    def _isWon(self):
+        """when the tic-tac-toe game comes to a winning connection"""
+        return (self.position1A==self.position2B==self.position3C!=None or
+            self.position1A==self.position2B==self.position3C!=None or
+            self.position1A==self.position1B==self.position1C!=None or
+            self.position2A==self.position2B==self.position2C!=None or
+            self.position3A==self.position3B==self.position3C!=None or
+            self.position1A==self.position2A==self.position3A!=None or
+            self.position1B==self.position2B==self.position3B!=None or
+            self.position1C==self.position2C==self.position3C!=None)
+
 
 class MoveForm(messages.Message):
     """outbound form message as response object after making a move"""

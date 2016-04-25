@@ -61,17 +61,6 @@ DEFAULTS = {
 class TictactoeApi(remote.Service):
     """Tictactoe API v0.1"""
 
-    def _isWon(self, game):
-        """when the tic-tac-toe game comes to a winning connection"""
-        return (game.position1A==game.position2B==game.position3C!=None or
-            game.position1A==game.position2B==game.position3C!=None or
-            game.position1A==game.position1B==game.position1C!=None or
-            game.position2A==game.position2B==game.position2C!=None or
-            game.position3A==game.position3B==game.position3C!=None or
-            game.position1A==game.position2A==game.position3A!=None or
-            game.position1B==game.position2B==game.position3B!=None or
-            game.position1C==game.position2C==game.position3C!=None)
-
     @endpoints.method(request_message=PLAYER_REQUEST,
                       response_message=PlayerForm,
                       path='user',
@@ -89,7 +78,7 @@ class TictactoeApi(remote.Service):
                     'A Player with that name already exists!')
         player = Player(displayName=request.user_name, mainEmail=request.email)
         player.put()
-        return player._copyPlayerToForm()
+        return player._copyPlayerToForm
 
     @endpoints.method(GAME_CREATE_REQUEST, GameForm,
                       path='create_game',
@@ -123,7 +112,7 @@ class TictactoeApi(remote.Service):
                           'gameInfo': repr(request)},
                           url='/tasks/send_confirmation_email')
             game = g_key.get()
-            return game._copyGameToForm()
+            return game._copyGameToForm
 
     @endpoints.method(message_types.VoidMessage, GamesForm,
                       path='all_games', http_method='GET', name='all_games')
@@ -133,7 +122,7 @@ class TictactoeApi(remote.Service):
         seatsAvailable.
         """
         games = Game.query().fetch()
-        items=[game._copyGameToForm() for game in games]
+        items=[game._copyGameToForm for game in games]
         # sort by
         sorted_items = sorted(items, key=lambda gf: gf.seatsAvailable, reverse=True)
         return GamesForm(items=sorted_items)
@@ -180,7 +169,7 @@ class TictactoeApi(remote.Service):
                 game.put()
                 player.put()
 
-        return game._copyGameToForm()
+        return game._copyGameToForm
 
     @endpoints.method(GAME_GET_REQUEST, GameForm,
                       path='game/{websafeGameKey}',
@@ -193,7 +182,7 @@ class TictactoeApi(remote.Service):
             raise endpoints.NotFoundException(
                 'No game found with key: {}' .format(request.websafeGameKey))
         # return GameForm
-        return game._copyGameToForm()
+        return game._copyGameToForm
 
 
     @endpoints.method(GAME_JOIN_REQUEST, GameForm,
@@ -236,7 +225,7 @@ class TictactoeApi(remote.Service):
         # write things back to the datastore & return
         player.put()
         game.put()
-        return game._copyGameToForm()
+        return game._copyGameToForm
 
     @endpoints.method(PLAYER_MINI_REQUEST, GamesForm,
                       path='games', http_method='GET', name='get_user_games')
@@ -258,7 +247,7 @@ class TictactoeApi(remote.Service):
                 'Not a single game has this player {} signed up for' .format(
                 request.player_name))
         return GamesForm(
-            items=[game._copyGameToForm() for game in games])
+            items=[game._copyGameToForm for game in games])
 
     @endpoints.method(GAME_MOVE_REQUEST, GameForm,
                       path='make_move/{websafeGameKey}/{positionTaken}',
@@ -309,7 +298,7 @@ class TictactoeApi(remote.Service):
                     'displayName'))
             setattr(game, 'lastPlayer', getattr(player,
                     'displayName'))
-            if self._isWon(game):
+            if game._isWon:
                 setattr(game, 'gameOver', True)
                 setattr(game, 'gameWinner', getattr(player,
                     'displayName'))
@@ -319,7 +308,7 @@ class TictactoeApi(remote.Service):
             game.put()
             player.put()
 
-        return game._copyGameToForm()
+        return game._copyGameToForm
 
 
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
@@ -329,7 +318,7 @@ class TictactoeApi(remote.Service):
         a list consisting of each Player's name and the winning percentage
         """
         players = Player.query().fetch()
-        items=[p._copyPlayerToRankForm() for p in players]
+        items=[p._copyPlayerToRankForm for p in players]
         sorted_items = sorted(items, key=lambda prf: prf.percentage, reverse=True)
         return PlayersRankForm(items=sorted_items)
 
@@ -339,13 +328,12 @@ class TictactoeApi(remote.Service):
                       http_method='GET', name='get_game_history')
     def getGameHistory(self, request):
         """ shows a list of all the moves for each game"""
-        game = ndb.Key(urlsafe=request.websafeGameKey).get()
-        game_key = game.key
+        game_key = ndb.Key(urlsafe=request.websafeGameKey)
         moves = Move.query(ancestor=game_key).fetch()
         if not moves:
             raise endpoints.NotFoundException('No moves found')
         else:
-            return MovesForm(items=[move._copyMoveToForm() for move in moves])
+            return MovesForm(items=[move._copyMoveToForm for move in moves])
 
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
