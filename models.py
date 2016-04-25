@@ -38,10 +38,21 @@ class Player(ndb.Model):
     # use MD5 hash of the email to use as id
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
-    gamesInProgress = ndb.StringProperty(repeated=True)  # games that she plays
+    gamesInProgress = ndb.StringProperty(repeated=True)  # games signed up for
     gamesCompleted = ndb.StringProperty(repeated=True)
     # winsTotal = ndb.IntegerProperty()
     # gamesTotal = ndb.IntegerProperty()
+
+    def _copyPlayerToForm(self):
+        """Copy relevant fields from player to PlayerForm."""
+        pf = PlayerForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        for field in pf.all_fields():
+            if hasattr(self, field.name):
+                setattr(pf, field.name, getattr(self, field.name))
+        pf.check_initialized()
+        return pf
 
     def _copyPlayerToRankForm(self):
         """Copy relevant fields from player to PlayerRankForm."""
@@ -77,6 +88,17 @@ class Move(ndb.Model):
     playerName = ndb.StringProperty()
     positionTaken = ndb.StringProperty()
 
+    def _copyMoveToForm(self):
+        """Copy relevant fields from Move to MoveForm."""
+        mf = MoveForm()
+        # all_fields: Gets all field definition objects. Returns an iterator
+        # over all values in arbitrary order.
+        for field in mf.all_fields():
+            if hasattr(self, field.name):
+                setattr(mf, field.name, getattr(self, field.name))
+        mf.check_initialized()
+        return mf
+
 
 class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
@@ -100,6 +122,16 @@ class Game(ndb.Model):
     gameWinner = ndb.StringProperty()
     # gameCancelled = ndb.BooleanProperty()
 
+    def _copyGameToForm(self):
+        """Copy relevant fields from Game to GameForm."""
+        gf = GameForm()
+        for field in gf.all_fields():
+            if hasattr(self, field.name):
+                setattr(gf, field.name, getattr(self, field.name))
+            elif field.name == "websafeKey":
+                setattr(gf, field.name, self.key.urlsafe())
+        gf.check_initialized()
+        return gf
 
 class MoveForm(messages.Message):
     """outbound form message as response object after making a move"""
