@@ -34,7 +34,8 @@ class SendMoveInviteEmailHandler(webapp2.RequestHandler):
                 app_identity.get_application_id()),
             self.request.get('email'),
             'Think of playing tic-tac-toe?',
-            'invite:\r\n\r\n{}' .format(self.request.get('moveInvite'))
+            'You are invited to make move on:\r\n\r\n{}' .format(
+                self.request.get('gameInfo'))
         )
 
 app = webapp2.WSGIApplication([
