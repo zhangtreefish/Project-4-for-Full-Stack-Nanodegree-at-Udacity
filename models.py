@@ -47,7 +47,7 @@ class Player(ndb.Model):
         # rounded_pct = 0
         if gamesTotal != 0:
             # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
-            percentage = float(winsTotal)/float(gamesTotal)
+            percentage = round(float(winsTotal)/float(gamesTotal), 2)
             # rounded_pct = int(np.round(percentage/0.01))*0.01
         setattr(prf, 'winsTotal', winsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)

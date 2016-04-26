@@ -271,6 +271,7 @@ class TictactoeApi(remote.Service):
         player = Player.query(Player.displayName == request.player_name).get()
         next_player_name = game.playerTwo if player.displayName == game.playerOne else game.playerOne
         next_player = Player.query(Player.displayName == next_player_name).get()
+        print('next_player', next_player_name)
         if game.gameOver:
             raise endpoints.UnauthorizedException('This game is already over.')
         # check if game is signed up by two players and by the current player
@@ -315,8 +316,7 @@ class TictactoeApi(remote.Service):
             # if no winner at step before 9, send a move invite to the opponent
             else:
                 taskqueue.add(params={'email': next_player.mainEmail,
-                              'moveInvite': 'Your opponent in game {} has just\
-                               moved.' .format(request.websafeGameKey)},
+                              'gameInfo': repr(request)},
                               url='/tasks/send_move_invite_email')
             game.put()
             player.put()

@@ -28,12 +28,13 @@ class SendConfirmationEmailHandler(webapp2.RequestHandler):
 class SendMoveInviteEmailHandler(webapp2.RequestHandler):
     def post(self):
         """Send email inviting the player of the turn to make a move."""
-        mail.send_email(
+        print('self.request', self.request)
+        mail.send_mail(
             'noreply@{}.appspotmail.com' .format(
                 app_identity.get_application_id()),
             self.request.get('email'),
             'Think of playing tic-tac-toe?',
-            self.request.get('moveInvite')
+            'invite:\r\n\r\n{}' .format(self.request.get('moveInvite'))
         )
 
 app = webapp2.WSGIApplication([
