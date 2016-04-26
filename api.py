@@ -263,17 +263,16 @@ class TictactoeApi(remote.Service):
         """
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = g_key.get()
-        # get the last_player for later notification
-        last_player = Player.query(Player.displayName == game.lastPlayer).get()
 
-        # create a move
+        # set up for a move
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
 
         player = Player.query(Player.displayName == request.player_name).get()
-
-        if game.gameWinner:
-            raise endpoints.UnauthorizedException('This game is already won.')
+        next_player_name = game.playerTwo if player.displayName == game.playerOne else game.playerOne
+        next_player = Player.query(Player.displayName == next_player_name).get()
+        if game.gameOver:
+            raise endpoints.UnauthorizedException('This game is already over.')
         # check if game is signed up by two players and by the current player
         elif game.playerOne is None or game.playerTwo is None:
             raise endpoints.UnauthorizedException(
@@ -283,10 +282,10 @@ class TictactoeApi(remote.Service):
         elif player.displayName not in [game.playerTwo, game.playerOne]:
             raise endpoints.UnauthorizedException('You did not sign up')
         # check if the player had played the last move
-        elif player.displayName == game.lastPlayer is not None:
+        elif player.displayName != game.nextPlayer is not None:
             raise endpoints.UnauthorizedException(
                 "Player {}, it is your opponent {}'s turn" .format(
-                    game.playerOne, game.playerTwo))
+                    player.displayName, game.nextPlayer))
         elif game.board[request.positionTaken] != '':
             raise endpoints.UnauthorizedException('The game board position {} \
              is already taken' .format(request.positionTaken))
@@ -302,16 +301,20 @@ class TictactoeApi(remote.Service):
             # Update Game on the position affected by the move, and player
             game.gameCurrentMove += 1
             game.board[request.positionTaken] = request.player_name
-            setattr(game, 'lastPlayer', getattr(player,
-                    'displayName'))
+            setattr(game, 'nextPlayer', next_player_name)
             if game._isWon:
+                setattr(game, 'gameWinner', getattr(player,'displayName'))
+
+            # if game.gameCurrentMove >= 9, it is a tie; end it nontheless
+            if game._isWon or game.gameCurrentMove >= 9:
                 setattr(game, 'gameOver', True)
-                setattr(game, 'gameWinner', getattr(player,
-                        'displayName'))
                 player.gamesInProgress.remove(g_key.urlsafe())
                 player.gamesCompleted.append(g_key.urlsafe())
-            elif last_player:
-                taskqueue.add(params={'email': last_player.mainEmail,
+                next_player.gamesInProgress.remove(g_key.urlsafe())
+                next_player.gamesCompleted.append(g_key.urlsafe())
+            # if no winner at step before 9, send a move invite to the opponent
+            else:
+                taskqueue.add(params={'email': next_player.mainEmail,
                               'moveInvite': 'Your opponent in game {} has just\
                                moved.' .format(request.websafeGameKey)},
                               url='/tasks/send_move_invite_email')

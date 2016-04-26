@@ -65,7 +65,7 @@ class Game(ndb.Model):
     board = ndb.PickleProperty()
     # moveLogs = ndb.StructuredProperty(Move, repeated=True)
     gameCurrentMove = ndb.IntegerProperty(default=0)
-    lastPlayer = ndb.StringProperty()
+    nextPlayer = ndb.StringProperty()
     gameOver = ndb.BooleanProperty(default=False)
     gameWinner = ndb.StringProperty()
 
