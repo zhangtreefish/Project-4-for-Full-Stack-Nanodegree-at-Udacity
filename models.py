@@ -3,22 +3,11 @@ import endpoints
 from protorpc import messages
 from google.appengine.ext import ndb
 
+
 class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
 
-class PositionNumber(messages.Enum):
-    """To denote the player and game piece during the moves"""
-    NOT_SPECIFIED = 1
-    position1A = 2
-    position1B = 3
-    position1C = 4
-    position2A = 5
-    position2B = 6
-    position2C = 7
-    position3A = 8
-    position3B = 9
-    position3C = 10
 
 class Player(ndb.Model):
     """A Kind to represent player profile"""
@@ -45,17 +34,18 @@ class Player(ndb.Model):
         prf = PlayerRankForm()
 
         setattr(prf, 'displayName', getattr(self, 'displayName'))
+        setattr(prf, 'mainEmail', getattr(self, 'mainEmail'))
         gamesWon = set()
         for g in self.gamesCompleted:
             game = ndb.Key(urlsafe=g).get()
-            if game and game.gameWinner==self.displayName:
+            if game and game.gameWinner == self.displayName:
                 gamesWon.add(g)
 
         winsTotal = len(gamesWon)
         gamesTotal = len(self.gamesCompleted)
         percentage = 0.00
         # rounded_pct = 0
-        if gamesTotal!=0:
+        if gamesTotal != 0:
             # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
             percentage = float(winsTotal)/float(gamesTotal)
             # rounded_pct = int(np.round(percentage/0.01))*0.01
@@ -96,14 +86,14 @@ class Game(ndb.Model):
     @property
     def _isWon(self):
         """when the tic-tac-toe game comes to a winning connection"""
-        return (self.board[0]==self.board[4]==self.board[8]!='' or
-            self.board[2]==self.board[4]==self.board[6]!='' or
-            self.board[0]==self.board[1]==self.board[2]!='' or
-            self.board[3]==self.board[4]==self.board[5]!='' or
-            self.board[6]==self.board[7]==self.board[8]!='' or
-            self.board[0]==self.board[3]==self.board[6]!='' or
-            self.board[1]==self.board[4]==self.board[7]!='' or
-            self.board[2]==self.board[5]==self.board[8]!='')
+        return (self.board[0] == self.board[4] == self.board[8] != '' or
+            self.board[2] == self.board[4] == self.board[6] != '' or
+            self.board[0] == self.board[1] == self.board[2] != '' or
+            self.board[3] == self.board[4] == self.board[5] != '' or
+            self.board[6] == self.board[7] == self.board[8] != '' or
+            self.board[0] == self.board[3] == self.board[6] != '' or
+            self.board[1] == self.board[4] == self.board[7] != '' or
+            self.board[2] == self.board[5] == self.board[8] != '')
 
 
 class Move(ndb.Model):
@@ -145,8 +135,9 @@ class PlayerRankForm(messages.Message):
     """as outbound response message pertaining players' ranking"""
     displayName = messages.StringField(1)
     winsTotal = messages.IntegerField(2)
-    gamesTotal = messages.IntegerField(3)
-    percentage = messages.FloatField(4)
+    mainEmail = messages.StringField(3)
+    gamesTotal = messages.IntegerField(4)
+    percentage = messages.FloatField(5)
 
 
 class PlayersRankForm(messages.Message):

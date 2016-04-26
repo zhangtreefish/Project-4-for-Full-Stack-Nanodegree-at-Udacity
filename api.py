@@ -4,15 +4,12 @@ from google.appengine.ext import db
 from google.appengine.api import taskqueue
 from settings import WEB_CLIENT_ID
 import endpoints
-import logging
 from protorpc import messages, message_types, remote
 from models import PlayerForm, Player, ConflictException
 from models import Game, GameForm, GamesForm
 from models import PlayersRankForm, BooleanMessage
-from models import Move, MovesForm, PositionNumber
+from models import Move, MovesForm
 from google.appengine.ext import ndb
-import pickle
-# import numpy as np
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -49,8 +46,9 @@ DEFAULTS = {
     "seatsAvailable": 2,
     "gameOver": False,
     "gameCurrentMove": 0,
-    "name":''
+    "name": ''
 }
+
 
 @endpoints.api(name='tictactoe',
                version='v1',
@@ -86,7 +84,7 @@ class TictactoeApi(remote.Service):
         """
         a player creates a game of a unique name
         """
-        player= Player.query(Player.displayName==request.player_name).get()
+        player = Player.query(Player.displayName == request.player_name).get()
         if not player:
             raise endpoints.NotFoundException(
                 'No player found with name: {}' .format(request.player_name))
@@ -96,7 +94,8 @@ class TictactoeApi(remote.Service):
         else:
             # allocate new Game ID with Player key as parent
             # allocate_ids(size=None, max=None, parent=None, **ctx_options)
-            # returns a tuple with (start, end) for the allocated range, inclusive.
+            # returns a tuple with (start, end) for the allocated range,
+            # inclusive.
             p_key = player.key
             g_id = Game.allocate_ids(size=1, parent=p_key)[0]
             # make Game key from ID; assign initial values to the game entity
@@ -121,9 +120,10 @@ class TictactoeApi(remote.Service):
         seatsAvailable.
         """
         games = Game.query().fetch()
-        items=[game._copyGameToForm for game in games]
+        items = [game._copyGameToForm for game in games]
         # sort by
-        sorted_items = sorted(items, key=lambda gf: gf.seatsAvailable, reverse=True)
+        sorted_items = sorted(
+            items, key=lambda gf: gf.seatsAvailable, reverse=True)
         return GamesForm(items=sorted_items)
 
     @endpoints.method(GAME_JOIN_REQUEST, GameForm,
@@ -142,7 +142,7 @@ class TictactoeApi(remote.Service):
             raise endpoints.NotFoundException(
                 'No game found with key: {}' .format(request.websafeGameKey))
         # get the requested player
-        player = Player.query(Player.displayName==request.player_name).get()
+        player = Player.query(Player.displayName == request.player_name).get()
         if not player:
             raise endpoints.NotFoundException(
                 'No player with name {} found' .format(request.player_name))
@@ -157,14 +157,13 @@ class TictactoeApi(remote.Service):
                     setattr(game, 'playerOne', request.player_name)
                     player.gamesInProgress.append(game_key.urlsafe())
                     game.seatsAvailable -= 1
-
                 elif game.playerTwo is None:
                     game.playerTwo = request.player_name
                     player.gamesInProgress.append(game_key.urlsafe())
                     game.seatsAvailable -= 1
-
                 else:
-                    raise endpoints.UnauthorizedException('Sorry, both spots taken!')
+                    raise endpoints.UnauthorizedException(
+                        'Sorry, both spots taken!')
                 game.put()
                 player.put()
 
@@ -183,7 +182,6 @@ class TictactoeApi(remote.Service):
         # return GameForm
         return game._copyGameToForm
 
-
     @endpoints.method(GAME_JOIN_REQUEST, GameForm,
                       path='cancel_game/{websafeGameKey}',
                       http_method='DELETE', name='cancel_game')
@@ -194,7 +192,7 @@ class TictactoeApi(remote.Service):
         """
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = g_key.get()
-        player = Player.query(Player.displayName==request.player_name).get()
+        player = Player.query(Player.displayName == request.player_name).get()
         if player is None:
             raise endpoints.NotFoundException(
                 'No player found with name: {}' .format(request.player_name))
@@ -204,7 +202,7 @@ class TictactoeApi(remote.Service):
         elif g_key.urlsafe() in player.gamesCompleted:
             raise endpoints.UnauthorizedException(
                 'Player can not cancel completed games')
-        elif game.gameCurrentMove>0:
+        elif game.gameCurrentMove > 0:
             raise endpoints.UnauthorizedException(
                 'Players can not cancel once the first has been made')
         elif g_key.urlsafe() in player.gamesInProgress:
@@ -233,10 +231,10 @@ class TictactoeApi(remote.Service):
         This returns all games a player has signed up for but has not
         completed, i.e., those in the gamesInProgress list.
         """
-        player = Player.query(Player.displayName==request.player_name).get()
-        game_keys =getattr(player,'gamesInProgress')
+        player = Player.query(Player.displayName == request.player_name).get()
+        game_keys = getattr(player, 'gamesInProgress')
 
-        key_objects=[ndb.Key(urlsafe=key) for key in game_keys]
+        key_objects = [ndb.Key(urlsafe=key) for key in game_keys]
 
         # Use get_multi(array_of_keys) to fetch all games at once.
         games = ndb.get_multi(key_objects)
@@ -244,7 +242,7 @@ class TictactoeApi(remote.Service):
         if not games:
             raise endpoints.NotFoundException(
                 'Not a single game has this player {} signed up for' .format(
-                request.player_name))
+                    request.player_name))
         return GamesForm(
             items=[game._copyGameToForm for game in games if game])
 
@@ -259,12 +257,14 @@ class TictactoeApi(remote.Service):
         """
         g_key = ndb.Key(urlsafe=request.websafeGameKey)
         game = g_key.get()
+        # get the last_player for later notification
+        last_player = Player.query(Player.displayName == game.lastPlayer).get()
 
         # create a move
         m_id = Move.allocate_ids(size=1, parent=g_key)[0]
         m_key = ndb.Key(Move, m_id, parent=g_key)
 
-        player = Player.query(Player.displayName==request.player_name).get()
+        player = Player.query(Player.displayName == request.player_name).get()
 
         if game.gameWinner:
             raise endpoints.UnauthorizedException('This game is already won.')
@@ -274,15 +274,14 @@ class TictactoeApi(remote.Service):
                 'Need 2 signed-up players to start')
         elif not player:
             raise endpoints.NotFoundException('no player found')
-               # check if the game is already completed
         elif player.displayName not in [game.playerTwo, game.playerOne]:
             raise endpoints.UnauthorizedException('You did not sign up')
         # check if the player had played the last move
-        elif player.displayName==game.lastPlayer!= None:
+        elif player.displayName == game.lastPlayer is not None:
             raise endpoints.UnauthorizedException(
                 "Player {}, it is your opponent {}'s turn" .format(
                     game.playerOne, game.playerTwo))
-        elif game.board[request.positionTaken]!='':
+        elif game.board[request.positionTaken] != '':
             raise endpoints.UnauthorizedException('The game board position {} \
              is already taken' .format(request.positionTaken))
         else:
@@ -294,7 +293,7 @@ class TictactoeApi(remote.Service):
             Move(**data).put()
             move = m_key.get()
 
-            # Update Game on the position affected by the move, as well as player
+            # Update Game on the position affected by the move, and player
             game.gameCurrentMove += 1
             game.board[request.positionTaken] = request.player_name
             setattr(game, 'lastPlayer', getattr(player,
@@ -302,15 +301,18 @@ class TictactoeApi(remote.Service):
             if game._isWon:
                 setattr(game, 'gameOver', True)
                 setattr(game, 'gameWinner', getattr(player,
-                    'displayName'))
+                        'displayName'))
                 player.gamesInProgress.remove(g_key.urlsafe())
                 player.gamesCompleted.append(g_key.urlsafe())
-                # setattr(player, 'winsTotal', player.winsTotal+1)
+            else:
+                taskqueue.add(params={'email': last_player.mainEmail,
+                              'moveInvite': 'Your opponent in game {} has just\
+                               moved.' .format(request.websafeGameKey)},
+                              url='/tasks/send_move_invite_email')
             game.put()
             player.put()
 
         return game._copyGameToForm
-
 
     @endpoints.method(message_types.VoidMessage, BooleanMessage,
                       path='delete_all_games', http_method='POST',
@@ -320,23 +322,23 @@ class TictactoeApi(remote.Service):
         deleting all Games created by current player, except those that are
         played.
         """
-        #keys_only:All operations return keys instead of entities.
+        # keys_only:All operations return keys instead of entities.
         ndb.delete_multi(Game.query().fetch(keys_only=True))
         deleted = True
         return BooleanMessage(data=deleted)
 
-
     @endpoints.method(message_types.VoidMessage, PlayersRankForm,
-        path='players_ranking', http_method='GET', name='get_user_rankings')
+                      path='players_ranking', http_method='GET',
+                      name='get_user_rankings')
     def getPlayerRankings(self, request):
         """
         a list consisting of each Player's name and the winning percentage
         """
         players = Player.query().fetch()
-        items=[p._copyPlayerToRankForm for p in players]
-        sorted_items = sorted(items, key=lambda prf: prf.percentage, reverse=True)
+        items = [p._copyPlayerToRankForm for p in players]
+        sorted_items = sorted(
+            items, key=lambda prf: prf.percentage, reverse=True)
         return PlayersRankForm(items=sorted_items)
-
 
     @endpoints.method(GAME_GET_REQUEST, MovesForm,
                       path='game_history/{websafeGameKey}',
@@ -349,7 +351,6 @@ class TictactoeApi(remote.Service):
             raise endpoints.NotFoundException('No moves found')
         else:
             return MovesForm(items=[move._copyMoveToForm for move in moves])
-
 
     # - - - Announcements - - - - - - - - - - - - - - - - - - - -
     @staticmethod

@@ -5,11 +5,13 @@ from google.appengine.api import app_identity
 from google.appengine.api import mail
 from api import TictactoeApi
 
+
 class SetAnnouncementHandler(webapp2.RequestHandler):
     def get(self):
         """Set Announcement in Memcache."""
         # use _cacheAnnouncement() to set announcement in Memcache
         TictactoeApi.getAnnouncement()
+
 
 class SendConfirmationEmailHandler(webapp2.RequestHandler):
     def post(self):
@@ -24,7 +26,20 @@ class SendConfirmationEmailHandler(webapp2.RequestHandler):
                 'gameInfo'))
         )
 
+
+class SendMoveInviteEmailHandler(webapp2.RequestHandler):
+    def post(self):
+        """Send email inviting the player of the turn to make a move."""
+        mail.send_email(
+            'noreply@{}.appspotmail.com' .format(
+                app_identity.get_application_id()),
+            self.request.get('email'),
+            'Think of playing tic-tac-toe?',
+            self.request.get('moveInvite')
+        )
+
 app = webapp2.WSGIApplication([
     ('/crons/set_announcement', SetAnnouncementHandler),
     ('/tasks/send_confirmation_email', SendConfirmationEmailHandler),
+    ('/tasks/send_move_invite_email', SendMoveInviteEmailHandler)
 ], debug=True)
