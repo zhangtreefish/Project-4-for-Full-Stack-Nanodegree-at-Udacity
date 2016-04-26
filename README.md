@@ -27,11 +27,7 @@
 5. A player plays by 'make_move': again need to enter the 'websafeGameKey'.
    For positionTaken pick any number from 0-8, with 0-2, 3-5, and 6-8
    representing the 1st, 2nd, and 3rd row respectively, within each row with
-   the number representing the grid from the left to right. i.e., the game
-   board looks like this:
-      0 1 2
-      3 4 5
-      6 7 8
+   the number representing the grid from the left to right.
 6. A player wins by connecting three grids in a straight line before the
    opponent.
 
