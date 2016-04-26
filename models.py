@@ -11,8 +11,8 @@ class ConflictException(endpoints.ServiceException):
 
 class Player(ndb.Model):
     """A Kind to represent player profile"""
-    displayName = ndb.StringProperty()
-    mainEmail = ndb.StringProperty()
+    displayName = ndb.StringProperty(required=True)
+    mainEmail = ndb.StringProperty(required=True)
     gamesInProgress = ndb.StringProperty(repeated=True)  # games signed up for
     gamesCompleted = ndb.StringProperty(repeated=True)
 
@@ -58,7 +58,7 @@ class Player(ndb.Model):
 
 class Game(ndb.Model):
     """A Kind for Game, instantiate with Player as parent"""
-    name = ndb.StringProperty()
+    name = ndb.StringProperty(required=True)
     seatsAvailable = ndb.IntegerProperty(default=2)
     playerOne = ndb.StringProperty()
     playerTwo = ndb.StringProperty()
@@ -98,9 +98,9 @@ class Game(ndb.Model):
 
 class Move(ndb.Model):
     """A Kind to record each move of a Game, call with Game as parent"""
-    moveNumber = ndb.IntegerProperty()
-    playerName = ndb.StringProperty()
-    positionTaken = ndb.IntegerProperty()
+    moveNumber = ndb.IntegerProperty(required=True)
+    playerName = ndb.StringProperty(required=True)
+    positionTaken = ndb.IntegerProperty(required=True)
 
     @property
     def _copyMoveToForm(self):

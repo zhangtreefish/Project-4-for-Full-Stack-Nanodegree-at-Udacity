@@ -69,6 +69,9 @@ class TictactoeApi(remote.Service):
         unique.)
 
         """
+        if request.user_name is None or request.email is None:
+            raise endpoints.UnauthorizedException(
+                    'Need user_name and email to create a player.')
         if Player.query(Player.displayName == request.user_name).get():
             raise endpoints.ConflictException(
                     'A Player with that name already exists!')
@@ -376,7 +379,7 @@ class TictactoeApi(remote.Service):
 
     @endpoints.method(message_types.VoidMessage, StringMessage,
                       path='tictactoe/announcement/get',
-                      http_method='GET', name='getAnnouncement')
+                      http_method='GET', name='get_announcement')
     def getAnnouncement(self, request):
         """Return Announcement from memcache."""
         self._cacheAnnouncement()
