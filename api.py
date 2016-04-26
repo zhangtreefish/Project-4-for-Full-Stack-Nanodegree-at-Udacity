@@ -126,7 +126,7 @@ class TictactoeApi(remote.Service):
         seatsAvailable.
         """
         games = Game.query().fetch()
-        items = [game._copyGameToForm for game in games]
+        items = [game._copyGameToForm for game in games if game]
         # sort by
         sorted_items = sorted(
             items, key=lambda gf: gf.seatsAvailable, reverse=True)
@@ -310,7 +310,7 @@ class TictactoeApi(remote.Service):
                         'displayName'))
                 player.gamesInProgress.remove(g_key.urlsafe())
                 player.gamesCompleted.append(g_key.urlsafe())
-            else:
+            elif last_player:
                 taskqueue.add(params={'email': last_player.mainEmail,
                               'moveInvite': 'Your opponent in game {} has just\
                                moved.' .format(request.websafeGameKey)},

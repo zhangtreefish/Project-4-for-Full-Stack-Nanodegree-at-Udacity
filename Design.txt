@@ -65,3 +65,6 @@ for.
 4.'You should have a Resource Container for the players!'A resource container
 for Player becomes necessary once I decoupled user from Player (see 1), so I
 added that.
+5. 'By using a list to store positions like i suggest further down, you wont
+ need to keep track of positions, you'll already have the indexes!' That is
+ a great leap forward, using a compound data structure. I switched to
