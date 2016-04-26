@@ -2,10 +2,10 @@
 # How to Use this API
 1. To test the API: visit https://tictactoe-2016.appspot.com/_ah/api/explorer
 2. If choosing to download the code and test the API locally for yourself:
--- Update the value of application in app.yaml to the app ID you have
+  -- Update the value of application in app.yaml to the app ID you have
    registered in the App Engine admin console if you would like to host your
    instance of this sample.
--- Run the app with the devserver using 'dev_appserver.py DIR', and go to
+  -- Run the app with the devserver using 'dev_appserver.py DIR', and go to
    http://localhost:8080/_ah/api/explorer, and do the following:
    In Windows press the window button and 'r' at the same time, and enter in
     the resulting box:
@@ -13,7 +13,7 @@
      --user-data-dir=%TMP%
      --unsafely-treat-insecure-origin-as-secure=http://localhost:8080
      http://localhost:8080/_ah/api/explorer
--- Optionally start the app with Google App Engine Launcher. See References/
+  -- Optionally start the app with Google App Engine Launcher. See References/
    setup/7 for detailed steps.
 
 # How to Play My Tic-tac-toe Game
@@ -25,18 +25,18 @@
 4. Play by 'MakeMove': need to enter the 'websafeGameKey';use 'getPlayerGames',
    'queryGames', or 'allGames' to find a game key
 
-## References
+# References
 
-# Products
+## Products
 - [App Engine][1]
 
-# Language
+## Language
 - [Python][2]
 
-# APIs
+## APIs
 - [Google Cloud Endpoints][3]
 
-# Setup
+## Setup
 1. registered in the App Engine admin console, get application-id
 2. Update the value of `application` in `app.yaml` to the application-id <like
    my 'tictactoe-2016'>
