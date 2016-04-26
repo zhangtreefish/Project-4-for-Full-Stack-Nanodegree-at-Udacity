@@ -153,25 +153,23 @@ class TictactoeApi(remote.Service):
             raise endpoints.NotFoundException(
                 'No player with name {} found' .format(request.player_name))
         # check if the player has already signed up
-        else:
-            if game_key.urlsafe() in player.gamesInProgress:
+        elif game_key.urlsafe() in player.gamesInProgress:
                 raise ConflictException(
                     "You have already registered for this game")
-            # update the specified game
-            else:
-                if game.playerOne is None:
-                    setattr(game, 'playerOne', request.player_name)
-                    player.gamesInProgress.append(game_key.urlsafe())
-                    game.seatsAvailable -= 1
-                elif game.playerTwo is None:
-                    game.playerTwo = request.player_name
-                    player.gamesInProgress.append(game_key.urlsafe())
-                    game.seatsAvailable -= 1
-                else:
-                    raise endpoints.UnauthorizedException(
-                        'Sorry, both spots taken!')
-                game.put()
-                player.put()
+        # update the specified game
+        elif game.playerOne is None:
+            setattr(game, 'playerOne', request.player_name)
+            player.gamesInProgress.append(game_key.urlsafe())
+            game.seatsAvailable -= 1
+        elif game.playerTwo is None:
+            game.playerTwo = request.player_name
+            player.gamesInProgress.append(game_key.urlsafe())
+            game.seatsAvailable -= 1
+        else:
+            raise endpoints.UnauthorizedException(
+                'Sorry, both spots taken!')
+        game.put()
+        player.put()
 
         return game._copyGameToForm
 
@@ -247,7 +245,7 @@ class TictactoeApi(remote.Service):
 
         if not games:
             raise endpoints.NotFoundException(
-                'Not a single game has this player {} signed up for' .format(
+                'Not a single active game is this player {}' .format(
                     request.player_name))
         return GamesForm(
             items=[game._copyGameToForm for game in games if game])
@@ -305,8 +303,15 @@ class TictactoeApi(remote.Service):
             setattr(game, 'nextPlayer', next_player_name)
             if game._isWon:
                 setattr(game, 'gameWinner', getattr(player,'displayName'))
-
-            # if game.gameCurrentMove >= 9, it is a tie; end it nontheless
+                # setattr(game, 'gameOver', True)
+                # player.gamesInProgress.remove(g_key.urlsafe())
+                # player.gamesCompleted.append(g_key.urlsafe())
+                # next_player.gamesInProgress.remove(g_key.urlsafe())
+                # next_player.gamesCompleted.append(g_key.urlsafe())
+            # if no win and game.gameCurrentMove >= 9, it is a tie;
+            # declare the winner as 'tie'
+            if game.gameCurrentMove >= 9:
+                setattr(game, 'gameWinner', 'tie')
             if game._isWon or game.gameCurrentMove >= 9:
                 setattr(game, 'gameOver', True)
                 player.gamesInProgress.remove(g_key.urlsafe())
@@ -320,6 +325,7 @@ class TictactoeApi(remote.Service):
                               url='/tasks/send_move_invite_email')
             game.put()
             player.put()
+            next_player.put()
 
         return game._copyGameToForm
 

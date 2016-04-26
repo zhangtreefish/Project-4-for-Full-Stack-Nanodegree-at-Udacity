@@ -36,20 +36,25 @@ class Player(ndb.Model):
         setattr(prf, 'displayName', getattr(self, 'displayName'))
         setattr(prf, 'mainEmail', getattr(self, 'mainEmail'))
         gamesWon = set()
+        gamesTied = set()
         for g in self.gamesCompleted:
             game = ndb.Key(urlsafe=g).get()
             if game and game.gameWinner == self.displayName:
                 gamesWon.add(g)
-
+            elif game and game.gameWinner == 'tie':
+                gamesTied.add(g)
+        # tally wins and ties, total points = wins + ties
         winsTotal = len(gamesWon)
+        tiesTotal = len(gamesTied)
+        pointsTotal =  winsTotal + tiesTotal/2
         gamesTotal = len(self.gamesCompleted)
         percentage = 0.00
         # rounded_pct = 0
         if gamesTotal != 0:
-            # percentage = '{:.2%}'.format(float(winsTotal)/float(gamesTotal))
-            percentage = round(float(winsTotal)/float(gamesTotal), 2)
+            # perc = '{:.2%}'.format(float(pointsTotal)/float(gamesTotal))
+            percentage = round(float(pointsTotal) / float(gamesTotal), 2)
             # rounded_pct = int(np.round(percentage/0.01))*0.01
-        setattr(prf, 'winsTotal', winsTotal)
+        setattr(prf, 'pointsTotal', pointsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)
         setattr(prf, 'percentage', percentage)
         prf.check_initialized()
@@ -127,14 +132,14 @@ class PlayerForm(messages.Message):
     mainEmail = messages.StringField(3)
     gamesInProgress = messages.StringField(4, repeated=True)
     gamesCompleted = messages.StringField(5, repeated=True)
-    # winsTotal = messages.IntegerField(6)
+    # pointsTotal = messages.IntegerField(6)
     # gamesTotal = messages.IntegerField(7)
 
 
 class PlayerRankForm(messages.Message):
     """as outbound response message pertaining players' ranking"""
     displayName = messages.StringField(1)
-    winsTotal = messages.IntegerField(2)
+    pointsTotal = messages.IntegerField(2)
     mainEmail = messages.StringField(3)
     gamesTotal = messages.IntegerField(4)
     percentage = messages.FloatField(5)
