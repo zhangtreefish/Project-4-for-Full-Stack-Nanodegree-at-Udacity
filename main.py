@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import webapp2
 from google.appengine.api import app_identity
 from google.appengine.api import mail

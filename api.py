@@ -87,6 +87,9 @@ class TictactoeApi(remote.Service):
         """
         a player creates a game of a unique name
         """
+        if request.game_name is None:
+            raise endpoints.UnauthorizedException(
+                'game_name is required to create a game')
         player = Player.query(Player.displayName == request.player_name).get()
         if not player:
             raise endpoints.NotFoundException(
