@@ -49,11 +49,8 @@ class Player(ndb.Model):
         pointsTotal =  winsTotal + tiesTotal/2
         gamesTotal = len(self.gamesCompleted)
         percentage = 0.00
-        # rounded_pct = 0
         if gamesTotal != 0:
-            # perc = '{:.2%}'.format(float(pointsTotal)/float(gamesTotal))
             percentage = round(float(pointsTotal) / float(gamesTotal), 2)
-            # rounded_pct = int(np.round(percentage/0.01))*0.01
         setattr(prf, 'pointsTotal', pointsTotal)
         setattr(prf, 'gamesTotal', gamesTotal)
         setattr(prf, 'percentage', percentage)
@@ -68,7 +65,6 @@ class Game(ndb.Model):
     playerOne = ndb.StringProperty()
     playerTwo = ndb.StringProperty()
     board = ndb.PickleProperty()
-    # moveLogs = ndb.StructuredProperty(Move, repeated=True)
     gameCurrentMove = ndb.IntegerProperty(default=0)
     nextPlayer = ndb.StringProperty()
     gameOver = ndb.BooleanProperty(default=False)
@@ -132,8 +128,6 @@ class PlayerForm(messages.Message):
     mainEmail = messages.StringField(3)
     gamesInProgress = messages.StringField(4, repeated=True)
     gamesCompleted = messages.StringField(5, repeated=True)
-    # pointsTotal = messages.IntegerField(6)
-    # gamesTotal = messages.IntegerField(7)
 
 
 class PlayerRankForm(messages.Message):
