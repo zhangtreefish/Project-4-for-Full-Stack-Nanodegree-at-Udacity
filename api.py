@@ -398,9 +398,10 @@ class TictactoeApi(remote.Service):
                 if last_move:
                     current_time = datetime.utcnow()
                     print ('current_time', current_time)
-                    if last_move.moveTime and current_time - last_move.moveTime > timedelta(minutes=5):
+                    if last_move.moveTime and (current_time - last_move.moveTime > timedelta(minutes=5)):
                         next_player = Player.query(Player.displayName == game.nextPlayer).get()
                         if next_player.mainEmail:
+                            print 'next_player.mainEmail', next_player.mainEmail
                             remindees.join(next_player.displayName)
                             mail.send_mail(
                                 'noreply@{}.appspotmail.com' .format(
