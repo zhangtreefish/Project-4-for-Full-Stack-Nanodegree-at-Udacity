@@ -10,7 +10,6 @@ from models import Game, GameForm, GamesForm
 from models import PlayersRankForm, BooleanMessage
 from models import Move, MovesForm
 from google.appengine.ext import ndb
-# from dateutil import parser
 from datetime import datetime, timedelta
 from google.appengine.api import mail
 from google.appengine.api import app_identity
@@ -239,20 +238,25 @@ class TictactoeApi(remote.Service):
         This returns all games a player has signed up for but has not
         completed, i.e., those in the gamesInProgress list.
         """
-        player = Player.query(Player.displayName == request.player_name).get()
-        game_keys = getattr(player, 'gamesInProgress')
-
-        key_objects = [ndb.Key(urlsafe=key) for key in game_keys]
-
-        # Use get_multi(array_of_keys) to fetch all games at once.
-        games = ndb.get_multi(key_objects)
-
-        if not games:
-            raise endpoints.NotFoundException(
-                'Not a single active game is this player {}' .format(
-                    request.player_name))
-        return GamesForm(
-            items=[game._copyGameToForm for game in games if game])
+        if request.player_name is None:
+            raise endpoints.NotFoundException('You did not enter player_name')
+        else:
+            player = Player.query(
+                Player.displayName == request.player_name).get()
+            if player is None:
+                raise endpoints.NotFoundException(
+                    'No player by the name of {}' .format(request.player_name))
+            else:
+                game_keys = getattr(player, 'gamesInProgress')
+                key_objects = [ndb.Key(urlsafe=key) for key in game_keys]
+                # Use get_multi(array_of_keys) to fetch all games at once.
+                games = ndb.get_multi(key_objects)
+                if not games:
+                    raise endpoints.NotFoundException(
+                        'Not a single active game is this player {}' .format(
+                            request.player_name))
+                return GamesForm(
+                    items=[game._copyGameToForm for game in games if game])
 
     @endpoints.method(GAME_MOVE_REQUEST, GameForm,
                       path='make_move/{websafeGameKey}/{positionTaken}',
@@ -397,8 +401,7 @@ class TictactoeApi(remote.Service):
                     Move.moveNumber==game.gameCurrentMove-1).get()
                 if last_move:
                     current_time = datetime.utcnow()
-                    print ('current_time', current_time)
-                    if last_move.moveTime and (current_time - last_move.moveTime > timedelta(minutes=5)):
+                    if last_move.moveTime and (current_time - last_move.moveTime > timedelta(days=5)):
                         next_player = Player.query(Player.displayName == game.nextPlayer).get()
                         if next_player.mainEmail:
                             print 'next_player.mainEmail', next_player.mainEmail
