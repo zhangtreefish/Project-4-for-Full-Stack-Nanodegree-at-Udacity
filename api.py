@@ -312,9 +312,9 @@ class TictactoeApi(remote.Service):
                 # next_player.gamesCompleted.append(g_key.urlsafe())
             # if no win and game.gameCurrentMove >= 9, it is a tie;
             # declare the winner as 'tie'
-            if game.gameCurrentMove >= 9:
+            if game.gameCurrentMove > 9:
                 setattr(game, 'gameWinner', 'tie')
-            if game._isWon or game.gameCurrentMove >= 9:
+            if game._isWon or game.gameCurrentMove > 9:
                 setattr(game, 'gameOver', True)
                 player.gamesInProgress.remove(g_key.urlsafe())
                 player.gamesCompleted.append(g_key.urlsafe())
