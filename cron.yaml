@@ -3,6 +3,6 @@ cron:
   url: /crons/set_announcement
   schedule: every 24 hours
 
-- description: Repopulate the Move Reminder every 5 minutes
+- description: Repopulate the Move Reminder every 72 hours
   url: /crons/set_move_invite_email
-  schedule: every 5 minutes
+  schedule: 72 hours
