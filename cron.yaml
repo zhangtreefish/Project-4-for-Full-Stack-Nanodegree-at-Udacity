@@ -5,4 +5,4 @@ cron:
 
 - description: Repopulate the Move Reminder every 72 hours
   url: /crons/set_move_invite_email
-  schedule: 72 hours
+  schedule: every 72 hours
