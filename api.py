@@ -12,6 +12,8 @@ from models import Move, MovesForm
 from google.appengine.ext import ndb
 # from dateutil import parser
 from datetime import datetime, timedelta
+from google.appengine.api import mail
+from google.appengine.api import app_identity
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -305,11 +307,6 @@ class TictactoeApi(remote.Service):
             setattr(game, 'nextPlayer', next_player_name)
             if game._isWon:
                 setattr(game, 'gameWinner', getattr(player,'displayName'))
-                # setattr(game, 'gameOver', True)
-                # player.gamesInProgress.remove(g_key.urlsafe())
-                # player.gamesCompleted.append(g_key.urlsafe())
-                # next_player.gamesInProgress.remove(g_key.urlsafe())
-                # next_player.gamesCompleted.append(g_key.urlsafe())
             # if no win and game.gameCurrentMove >= 9, it is a tie;
             # declare the winner as 'tie'
             if game.gameCurrentMove > 9:
@@ -321,10 +318,6 @@ class TictactoeApi(remote.Service):
                 next_player.gamesInProgress.remove(g_key.urlsafe())
                 next_player.gamesCompleted.append(g_key.urlsafe())
             # if no winner at step before 9, send a move invite to the opponent
-            else:
-                taskqueue.add(params={'email': next_player.mainEmail,
-                              'gameInfo': repr(request)},
-                              url='/tasks/send_move_invite_email')
             game.put()
             player.put()
             next_player.put()
@@ -391,27 +384,33 @@ class TictactoeApi(remote.Service):
 
         return announcement
 
-    # @staticmethod
-    # def _cacheMoveReminder():
-    #     """Create MoveReminder & assign to memcache; used by
-    #     memcache cron job & getMoveReminder().
-    #     """
-    #     games = Game.query(Game.gameCurrentMove < 9 and Game.gameCurrentMove > 0).fetch()
-    #     if games:
-    #         # If there are games ready for sign up,
-    #         # format announcement and set it in memcache for each game
-    #         for game in games:
-    #             Last_move = Move.query(Move.moveNumber==game.currentMove-1).fetch()
-    #             current_time = datetime.now()
-    #             if current_time - last_move.moveTime < timedelta(days=5):
-    #                 reminder = 'It has been a long time you played game {}... come \
-    #                     play!' .format(game.name or '')
-    #                 memcache.set(game.name, reminder)
-    #     else:
-    #                 # If there are no available games,
-    #                 # delete the memcache announcements entry
-    #         reminder = ""
-    #     return reminder
+    @staticmethod
+    def _prepReminder():
+        games = Game.query(
+            Game.gameCurrentMove < 9 and Game.gameCurrentMove > 0).fetch()
+        remindees = ''
+        if games:
+            # If there are games ready for sign up,
+            # format announcement and set it in memcache for each game
+            for game in games:
+                last_move = Move.query(
+                    Move.moveNumber==game.gameCurrentMove-1).get()
+                if last_move:
+                    current_time = datetime.utcnow()
+                    print ('current_time', current_time)
+                    if last_move.moveTime and current_time - last_move.moveTime > timedelta(minutes=5):
+                        next_player = Player.query(Player.displayName == game.nextPlayer).get()
+                        if next_player.mainEmail:
+                            remindees.join(next_player.displayName)
+                            mail.send_mail(
+                                'noreply@{}.appspotmail.com' .format(
+                                    app_identity.get_application_id()),
+                                next_player.mainEmail,
+                                'Coming back to tic-tac-toe?',
+                                'It has been 5 days since the last move on:\r\n\r\n{}' .format(
+                                    game.name)
+                            )
+        return remindees
 
     @endpoints.method(message_types.VoidMessage, StringMessage,
                       path='tictactoe/announcement/get',
@@ -427,32 +426,10 @@ class TictactoeApi(remote.Service):
     @endpoints.method(message_types.VoidMessage, StringMessage,
                       path='tictactoe/move_reminders/get',
                       http_method='GET', name='get_move_reminders')
-    def getMoveReminders(self, request):
+    def getMoveReminder(self, request):
         """Return move reminders."""
-        games = Game.query(
-            Game.gameCurrentMove < 9 and Game.gameCurrentMove > 0).fetch()
-        remindees = ''
-        if games:
-            # If there are games ready for sign up,
-            # format announcement and set it in memcache for each game
-            for game in games:
-                last_move = Move.query(
-                    Move.moveNumber==game.gameCurrentMove-1).fetch()[0]
-                current_time = datetime.now()
-                print ('current_time', current_time)
-                if last_move.moveTime and current_time - last_move.moveTime > timedelta(minutes=5):
-                    next_player = game.nextPlayer
-                    if next_player.mainEmail:
-                        remindees.join(next_player.displayName)
-                        mail.send_mail(
-                            'noreply@{}.appspotmail.com' .format(
-                                app_identity.get_application_id()),
-                            next_player.mainEmail,
-                            'Coming back to tic-tac-toe?',
-                            'It has been 5 days since the last move on:\r\n\r\n{}' .format(
-                                game.name)
-                        )
-        return StringMessage(data='Reminders for {} set up!' .format(remindees))
+        reminder = self._prepReminder()
+        return StringMessage(data='Reminders for {} set up!' .format(reminder))
 
 # registers API
 api = endpoints.api_server([TictactoeApi])

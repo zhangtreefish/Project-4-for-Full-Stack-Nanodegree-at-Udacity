@@ -22,7 +22,7 @@ handlers:       # static then dynamic
   script: main.app
   login: admin
 
-- url: /tasks/send_move_invite_email
+- url: /crons/set_move_invite_email
   script: main.app
   login: admin
 
