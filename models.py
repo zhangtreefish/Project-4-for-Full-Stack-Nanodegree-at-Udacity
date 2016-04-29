@@ -1,5 +1,6 @@
 import httplib
 import endpoints
+import datetime
 from protorpc import messages
 from google.appengine.ext import ndb
 
@@ -102,6 +103,7 @@ class Move(ndb.Model):
     moveNumber = ndb.IntegerProperty(required=True)
     playerName = ndb.StringProperty(required=True)
     positionTaken = ndb.IntegerProperty(required=True)
+    moveTime = ndb.DateTimeProperty(auto_now_add=True)
 
     @property
     def _copyMoveToForm(self):
@@ -110,7 +112,9 @@ class Move(ndb.Model):
         # all_fields: Gets all field definition objects. Returns an iterator
         # over all values in arbitrary order.
         for field in mf.all_fields():
-            if hasattr(self, field.name):
+            if field.name == 'moveTime':
+                setattr(mf, field.name, str(getattr(self, field.name)))
+            elif hasattr(self, field.name):
                 setattr(mf, field.name, getattr(self, field.name))
         mf.check_initialized()
         return mf
@@ -173,6 +177,7 @@ class MoveForm(messages.Message):
     moveNumber = messages.IntegerField(1)
     playerName = messages.StringField(2)
     positionTaken = messages.IntegerField(3)
+    moveTime = messages.StringField(4)  # not DateTimeField?
 
 
 class MovesForm(messages.Message):

@@ -8,9 +8,27 @@ class SetAnnouncementHandler(webapp2.RequestHandler):
     def get(self):
         """Set Announcement in Memcache."""
         # use _cacheAnnouncement() to set announcement in Memcache
-        TictactoeApi.getAnnouncement()
+        TictactoeApi.getAnnouncement(self.request)
 
 
+# class SetMoveReminderHandler(webapp2.RequestHandler):
+#     def get(self):
+#     """Set Move Reminder in Memcache."""
+#         TictactoeApi.getMoveReminder()
+
+
+# class SendConfirmationEmailHandler(webapp2.RequestHandler):
+#     def post(self):
+#         """Send email confirming Game creation."""
+#         mail.send_mail(
+#             'noreply@{}.appspotmail.com' .format(
+#                 app_identity.get_application_id()),     # from
+#             self.request.get('email'),                  # to
+#             'You created a new tictactoe game!',        # subj
+#             'Hi, you have created a following '         # body
+#             'game:\r\n\r\n{}' .format(self.request.get(
+#                 'gameInfo'))
+#         )
 class SendConfirmationEmailHandler(webapp2.RequestHandler):
     def post(self):
         """Send email confirming Game creation."""
@@ -24,19 +42,15 @@ class SendConfirmationEmailHandler(webapp2.RequestHandler):
                 'gameInfo'))
         )
 
-
 class SendMoveInviteEmailHandler(webapp2.RequestHandler):
     def post(self):
-        """Send email inviting the player of the turn to make a move."""
-        print('self.request', self.request)
-        mail.send_mail(
-            'noreply@{}.appspotmail.com' .format(
-                app_identity.get_application_id()),
-            self.request.get('email'),
-            'Think of playing tic-tac-toe?',
-            'You are invited to make move on:\r\n\r\n{}' .format(
-                self.request.get('gameInfo'))
-        )
+        """
+        Send email inviting the player of the turn to make a move if 5days
+        has elapsed since the last move.
+        """
+        # print('self.request', self.request)
+        TictactoeApi.getMoveReminders(self.request)
+
 
 app = webapp2.WSGIApplication([
     ('/crons/set_announcement', SetAnnouncementHandler),
