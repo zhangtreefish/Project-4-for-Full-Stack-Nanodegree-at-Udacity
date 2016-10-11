@@ -8,10 +8,10 @@ import rootReducer from './reducers';
 const isClient = typeof document !== 'undefined';
 const isDeveloping = process.env.NODE_ENV !== 'production';
 
-import { initialState as landing } from './containers/LandingContainer/reducer';
+import { initialState as landingReducer } from './containers/LandingContainer/reducer';
 
 const initialState = {
-  landing,
+  landingReducer,
 };
 
 /* Commonly used middlewares and enhancers */

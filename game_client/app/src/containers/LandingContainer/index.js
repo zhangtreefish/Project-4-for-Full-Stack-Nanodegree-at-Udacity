@@ -1,15 +1,17 @@
 import React, { PropTypes, Component } from 'react';
 /* eslint-disable import/no-unresolved */
-import {
-  LogoImage,
-  Header,
-} from 'components';
+import { Game } from 'components';
 /* eslint-enable import/no-unresolved */
 import styles from './index.module.scss';
 import cssModules from 'react-css-modules';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import * as MyActions from './actions';
+import Heading from 'grommet-udacity/components/Heading';
+import Box from 'grommet-udacity/components/Box';
+import Section from 'grommet-udacity/components/Section';
+import Tiles from 'grommet-udacity/components/Tiles';
+import Tile from 'grommet-udacity/components/Tile';
 
 export class LandingContainer extends Component {
   constructor(props) {
@@ -35,16 +37,27 @@ export class LandingContainer extends Component {
         {isLoading ?
           <h1>LOADING...</h1>
         :
-          <div>
-            <LogoImage
-              imageSource="https://d30y9cdsu7xlg0.cloudfront.net/png/76612-200.png"
-            />
-            <div className={styles.headerText}>
-              <Header
-                content="Scaling the Front End feature first with the tictactoe game!"
-              />
-            </div>
-          </div>
+          <Section pad="small" direction="column" pad={{ vertical: 'medium' }}>
+            <Heading tag="h2" align="center">
+              Games
+            </Heading>
+            <Box pad={{ vertical: 'small' }} direction="row">
+              <Tiles flush fill className={styles.mainSection}>
+                {games.map((game, i) =>
+                  <Tile
+                    key={i}
+                    align="start"
+                    basis="small"
+                    direction="row"
+                    separator="bottom"
+                    className={styles.game}
+                  >
+                    <Game game={game} />
+                  </Tile>
+                )}
+              </Tiles>
+            </Box>
+          </Section>
         }
       </div>
     );

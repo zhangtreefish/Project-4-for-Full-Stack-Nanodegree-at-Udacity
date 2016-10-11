@@ -37,8 +37,11 @@ export const loadGames = () =>
       loadDataInitiation()
     );
     fetch(gamesUrl)
-      .then(res => res.json())
-      .then(res => res.games)
+      .then(res => {
+        console.log(`data?{res.json()}`);
+        return res.json();
+      })
+      .then(res => res.items)
       .then(games =>
         games.filter(game => !game.gameOver)
       )

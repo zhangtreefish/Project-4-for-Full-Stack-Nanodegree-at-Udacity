@@ -7,8 +7,8 @@ import {
 
 export const initialState = {
   isLoading: false,
-  games: {},
-  error: [],
+  games: null,
+  errors: null,
 };
 
 /**
@@ -32,11 +32,11 @@ const landingReducer = (state = initialState, action) => {
     case LOAD_DATA_FAILURE:
       return Object.assign({}, state, {
         isLoading: false,
-        error: action.error,
+        errors: action.errors,
       });
     case CLEAR_DATA_ERROR:
       return Object.assign({}, state, {
-        error: {},
+        errors: null,
       });
     default:
       return state;
