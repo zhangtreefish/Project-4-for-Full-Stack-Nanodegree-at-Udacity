@@ -1,0 +1,1 @@
+The front end of the tic_tac_toe game is fashioned after the [React Scalable Boilerplate](https://github.com/RyanCCollins/scalable-react-boilerplate). Many thanks to RyanCollins and others at [Udacity Alumni Client](https://github.com/udacityalumni/alumni-client) team for sharing knowledge.
