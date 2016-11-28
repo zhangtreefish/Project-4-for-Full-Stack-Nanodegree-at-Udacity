@@ -12,7 +12,7 @@ const Navbar = () => (
   <div className={styles.navbar}>
     <Header justify="between">
       <Title>
-        <img className={styles.logo} src='https://d30y9cdsu7xlg0.cloudfront.net/png/76612-200.png' alt='logo'/>
+        <img className={styles.logo} src="https://d30y9cdsu7xlg0.cloudfront.net/png/76612-200.png" alt="logo" />
       </Title>
       <Menu direction="row" align="center" responsive={false}>
         <Anchor href="#" className="active">

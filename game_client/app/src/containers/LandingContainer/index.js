@@ -32,6 +32,22 @@ export class LandingContainer extends Component {
       isLoading,
       games,
     } = this.props;
+    console.log('games:', games);
+    const lagames = { items:
+      [
+        {
+          gameCurrentMove: '3',
+          name: 'new1',
+          playerTwo: 'heeler',
+          gameBoard: '   heeler heeler  sun  ',
+          seatsAvailable: '0',
+          websafeKey: 'ahBzfnRpY3RhY3RvZS0yMDE2ch8LEgZQbGF5ZXIYgICAgLyhggoMCxIER2FtZRix6gEM',
+          gameOver: false,
+          playerOne: 'sunny',
+          kind: 'tictactoe#resourcesItem',
+        },
+      ],
+    };
     return (
       <div className={styles.container}>
         {isLoading ?
@@ -43,7 +59,7 @@ export class LandingContainer extends Component {
             </Heading>
             <Box pad={{ vertical: 'small' }} direction="row">
               <Tiles flush fill className={styles.mainSection}>
-                {games.map((game, i) =>
+                {lagames.items.map((game, i) =>
                   <Tile
                     key={i}
                     align="start"

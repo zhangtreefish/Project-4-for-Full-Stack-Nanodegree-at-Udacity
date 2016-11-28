@@ -5,8 +5,8 @@ import {
   CLEAR_DATA_ERROR,
 } from './constants';
 import 'whatwg-fetch';
-const baseUrl = 'https://tictactoe-2016.appspot.com/_ah/';
-const gamesUrl = `${baseUrl}api/tictactoe/v1/all_games`;
+const baseUrl = 'https://tictactoe-2016.appspot.com';
+const gamesUrl = `${baseUrl}/_ah/api/tictactoe/v1/all_games?fields=items`;
 
 // loadDataInitiation :: None -> {Action}
 export const loadDataInitiation = () => ({
@@ -37,20 +37,8 @@ export const loadGames = () =>
       loadDataInitiation()
     );
     fetch(gamesUrl)
-      .then(res => {
-        console.log(`data?{res.json()}`);
-        return res.json();
-      })
-      .then(res => res.items)
-      .then(games =>
-        games.filter(game => !game.gameOver)
-      )
-      .then(games =>
-        games.sort((a, b) =>
-          a.seatsAvailable - b.seatsAvailable
-        )
-      )
-      .then(games => games.slice(0, 4))
+      .then(res => res.json())
+      .then(json => json.items)
       .then(games => {
         dispatch(
           loadDataSuccess(games)
