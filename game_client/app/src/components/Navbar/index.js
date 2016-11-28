@@ -16,13 +16,10 @@ const Navbar = () => (
       </Title>
       <Menu direction="row" align="center" responsive={false}>
         <Anchor href="#" className="active">
-          First
+          Games
         </Anchor>
         <Anchor href="#">
-          Second
-        </Anchor>
-        <Anchor href="#">
-          Third
+          Players
         </Anchor>
         <Search dropAlign={{ right: 'right' }} />
       </Menu>

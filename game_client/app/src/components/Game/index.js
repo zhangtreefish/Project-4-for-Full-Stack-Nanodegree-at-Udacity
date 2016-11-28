@@ -8,13 +8,13 @@ import Paragraph from 'grommet-udacity/components/Paragraph';
 const Game = ({
   game,
 }) => (
-  <Box>
-    <Paragraph> name:{game.name} </Paragraph>
-    <Paragraph> seatsAvailable:{game.seatsAvailable} </Paragraph>
-    <Paragraph> playerOne:{game.playerOne} </Paragraph>
-    <Paragraph> playerTwo:{game.playerTwo} </Paragraph>
-    <Paragraph> gameCurrentMove:{game.gameCurrentMove} </Paragraph>
-    <Paragraph> gameBoard:{game.gameBoard} </Paragraph>
+  <Box colorIndex="accent-2-a">
+    <Paragraph size="large"> name:{game.name} </Paragraph>
+    <Paragraph size="large"> seatsAvailable:{game.seatsAvailable} </Paragraph>
+    <Paragraph size="large"> playerOne:{game.playerOne} </Paragraph>
+    <Paragraph size="large"> playerTwo:{game.playerTwo} </Paragraph>
+    <Paragraph size="large"> gameCurrentMove:{game.gameCurrentMove} </Paragraph>
+    <Paragraph size="large"> gameBoard:{game.gameBoard} </Paragraph>
   </Box>
 );
 
